@@ -25,6 +25,7 @@ leiden_local <- function(data, markers, k = 30, res = 1, niter = 10, seed = 1234
   require(RANN)
   require(Rphenograph)
   require(leiden)
+  require(data.table)
 
   #- Data & function
   jaccard_coeff <- function(idx) {
