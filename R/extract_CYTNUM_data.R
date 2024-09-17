@@ -21,9 +21,9 @@ extract_CYTNUM_data <- function(gs,
                                 cytokine_nodes)
 {
   ##-- Require
-  #require(flowWorkspace)
+  require(flowWorkspace)
   require(tidyverse)
-  #require(data.table)
+  require(data.table)
 
 
   ##-- Extraction
