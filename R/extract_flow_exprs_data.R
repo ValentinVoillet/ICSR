@@ -33,25 +33,24 @@ extract_flow_exprs_data <- function(gs,
   ##-- Require
   require(flowWorkspace)
   require(tidyverse)
-  require(data.table)
 
 
   ##-- Extraction
-  exprs.tmp <- lapply(gs, function(x)
+  exprs.tmp <- flowWorkspace::lapply(gs, function(x)
   {
     cat("\t", pData(x) %>% rownames(), "\n")
 
     #- Annotation
-    annotation <- data.frame(markername = markernames(x) %>% names(),
-                             colname = sapply(X = markernames(x), FUN = function(x) str_split(string = x, pattern = " ")[[1]][1]),
-                             row.names = markernames(x) %>% names()) %>%
-      mutate(colname = str_replace_all(string = colname, pattern = "/", replacement = "_")) %>%
-      mutate(colname = case_when(colname == "Integrin" ~ "Integrin-B7",
-                                 colname == "Granzyme" ~ "Granzyme-B",
-                                 colname == "GzB" ~ "Granzyme-B",
-                                 colname == "PD1" ~ "PD-1",
-                                 colname == "TNFa" ~ "TNF",
-                                 .default = colname))
+    annotation <- data.frame(markername = flowWorkspace::markernames(x) %>% names(),
+                             colname = sapply(X = flowWorkspace::markernames(x), FUN = function(x) str_split(string = x, pattern = " ")[[1]][1]),
+                             row.names = flowWorkspace::markernames(x) %>% names()) %>%
+      dplyr::mutate(colname = str_replace_all(string = colname, pattern = "/", replacement = "_")) %>%
+      dplyr::mutate(colname = case_when(colname == "Integrin" ~ "Integrin-B7",
+                                        colname == "Granzyme" ~ "Granzyme-B",
+                                        colname == "GzB" ~ "Granzyme-B",
+                                        colname == "PD1" ~ "PD-1",
+                                        colname == "TNFa" ~ "TNF",
+                                        .default = colname))
 
     #- Get compensated data
     if(do.comp == TRUE){
@@ -90,30 +89,29 @@ extract_flow_exprs_data <- function(gs,
 
     #- Get boolean positivity call for markers
     options(warn = 0)
-    marker_response <- try(lapply(output_nodes, function(mrkr){gh_pop_get_indices(x, mrkr)}))
+    marker_response <- try(lapply(output_nodes, function(mrkr){flowWorkspace::gh_pop_get_indices(x, mrkr)}))
     while(class(marker_response) == "try-error"){
-      marker_response <- try(lapply(output_nodes, function(mrkr){gh_pop_get_indices(x, mrkr)}))
+      marker_response <- try(lapply(output_nodes, function(mrkr){flowWorkspace::gh_pop_get_indices(x, mrkr)}))
     }
     names(marker_response) <- output_nodes
-    marker_response <- bind_rows(marker_response)
+    marker_response <- dplyr::bind_rows(marker_response)
 
     #- data.table()
-    dt.res <- bind_cols(comp.FI, biexp.FI, asinh.FI, marker_response) %>%
-      data.table() %>%
-      mutate(FCS = rownames(pData(x))) %>%
-      mutate(BATCH = pData(x)$BATCH) %>%
-      mutate(PTID = pData(x)$PTID) %>%
-      mutate(STIM = pData(x)$STIM) %>%
-      mutate(VISITNO = pData(x)$VISITNO) %>%
-      mutate(RUNNUM = pData(x)$`Run Num`) %>%
-      mutate(REPLICATE = pData(x)$Replicate) %>%
-      mutate(SAMP_ORD = pData(x)$SAMP_ORD)
+    dt.res <- dplyr::bind_cols(comp.FI, biexp.FI, asinh.FI, marker_response) %>%
+      dplyr::mutate(FCS = rownames(pData(x))) %>%
+      dplyr::mutate(BATCH = pData(x)$BATCH) %>%
+      dplyr::mutate(PTID = pData(x)$PTID) %>%
+      dplyr::mutate(STIM = pData(x)$STIM) %>%
+      dplyr::mutate(VISITNO = pData(x)$VISITNO) %>%
+      dplyr::mutate(RUNNUM = pData(x)$`Run Num`) %>%
+      dplyr::mutate(REPLICATE = pData(x)$Replicate) %>%
+      dplyr::mutate(SAMP_ORD = pData(x)$SAMP_ORD)
 
     #- Output
     dt.output <- dt.res %>%
-      filter(get({{parent_node}}) == TRUE) %>%
-      group_by(FCS, BATCH, PTID, STIM, VISITNO, RUNNUM, REPLICATE, SAMP_ORD) %>%
-      mutate(NSUB = n())
+      dplyr::filter(get({{parent_node}}) == TRUE) %>%
+      dplyr::group_by(FCS, BATCH, PTID, STIM, VISITNO, RUNNUM, REPLICATE, SAMP_ORD) %>%
+      dplyr::mutate(NSUB = n())
     dt.output$CYTNUM <- apply(dt.output[, cytokine_nodes], 1, function(x) sum(x == TRUE))
     cols <- c("FCS", "BATCH", "PTID", "STIM", "VISITNO", "RUNNUM", "REPLICATE", "SAMP_ORD", "NSUB", "CYTNUM",
               colnames(dt.output)[str_detect(string = colnames(dt.output), pattern = "Time")],
@@ -121,14 +119,14 @@ extract_flow_exprs_data <- function(gs,
               colnames(dt.output)[str_detect(string = colnames(dt.output), pattern = "biexp")],
               colnames(dt.output)[str_detect(string = colnames(dt.output), pattern = "asinh")])
     dt.output <- dt.output %>%
-      ungroup() %>%
-      filter(CYTNUM >= 1) %>%
-      select(all_of(cols))
+      dplyr::ungroup() %>%
+      dplyr::filter(CYTNUM >= 1) %>%
+      dplyr::select(all_of(cols))
     dt.output %>% return()
   })
 
 
   ##-- Output
-  bind_rows(exprs.tmp) %>% return()
+  dplyr::bind_rows(exprs.tmp) %>% return()
 }
 
