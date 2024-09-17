@@ -29,28 +29,28 @@ extract_CYTNUM_data <- function(gs,
   ##-- Extraction
   exprs.tmp <- lapply(gs, function(x)
   {
-    cat("\t", pData(x) %>% rownames(), "\n")
+    cat("\t", flowWorkspace::pData(x) %>% rownames(), "\n")
 
     #- Get boolean positivity call for markers
     options(warn = 0)
-    marker_response <- try(lapply(c(parent_node, cytokine_nodes), function(mrkr){gh_pop_get_indices(x, mrkr)}))
+    marker_response <- try(lapply(c(parent_node, cytokine_nodes), function(mrkr){flowWorkspace::gh_pop_get_indices(x, mrkr)}))
     while(class(marker_response) == "try-error"){
-      marker_response <- try(lapply(c(parent_node, cytokine_nodes), function(mrkr){gh_pop_get_indices(x, mrkr)}))
+      marker_response <- try(lapply(c(parent_node, cytokine_nodes), function(mrkr){flowWorkspace::gh_pop_get_indices(x, mrkr)}))
     }
     names(marker_response) <- c(parent_node, cytokine_nodes)
-    marker_response <- bind_rows(marker_response)
+    marker_response <- dplyr::bind_rows(marker_response)
 
     #- data.table()
     dt.res <- marker_response %>%
       data.table() %>%
-      dplyr::mutate(FCS = rownames(pData(x))) %>%
-      dplyr::mutate(BATCH = pData(x)$BATCH) %>%
-      dplyr::mutate(PTID = pData(x)$PTID) %>%
-      dplyr::mutate(STIM = pData(x)$STIM) %>%
-      dplyr::mutate(VISITNO = pData(x)$VISITNO) %>%
-      dplyr::mutate(RUNNUM = pData(x)$`Run Num`) %>%
-      dplyr::mutate(SAMP_ORD = pData(x)$SAMP_ORD) %>%
-      dplyr::mutate(REPLICATE = pData(x)$Replicate)
+      dplyr::mutate(FCS = rownames(flowWorkspace::pData(x))) %>%
+      dplyr::mutate(BATCH = flowWorkspace::pData(x)$BATCH) %>%
+      dplyr::mutate(PTID = flowWorkspace::pData(x)$PTID) %>%
+      dplyr::mutate(STIM = flowWorkspace::pData(x)$STIM) %>%
+      dplyr::mutate(VISITNO = flowWorkspace::pData(x)$VISITNO) %>%
+      dplyr::mutate(RUNNUM = flowWorkspace::pData(x)$`Run Num`) %>%
+      dplyr::mutate(SAMP_ORD = flowWorkspace::pData(x)$SAMP_ORD) %>%
+      dplyr::mutate(REPLICATE = flowWorkspace::pData(x)$Replicate)
     dt.res$CYTNUM <- apply(dt.res[, ..cytokine_nodes], 1, function(x) sum(x == TRUE))
 
     #- Output
@@ -66,6 +66,6 @@ extract_CYTNUM_data <- function(gs,
 
 
   ##-- Output
-  bind_rows(exprs.tmp) %>% return()
+  dplyr::bind_rows(exprs.tmp) %>% return()
 }
 
