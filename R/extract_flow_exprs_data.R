@@ -77,9 +77,9 @@ extract_flow_exprs_data <- function(gs,
       comp.FI <- comp.FI[, intersect(colnames(comp.FI), annotation$markername)]
       colnames(comp.FI) <- paste("comp", annotation[colnames(comp.FI), "colname"], sep = "_")
       markers <- colnames(comp.FI)
-      asinh.FI <- do_asinh_local(dat = comp.FI %>% as.data.table(),
-                                 use.cols = markers,
-                                 cofactor = cofactor)
+      asinh.FI <- ICSR::do_asinh_local(dat = comp.FI %>% as.data.table(),
+                                       use.cols = markers,
+                                       cofactor = cofactor)
       markers <- colnames(asinh.FI)[str_detect(string = colnames(asinh.FI), pattern = "asinh")]
       asinh.FI <- asinh.FI[, ..markers]
       colnames(asinh.FI) <- str_replace_all(string = colnames(asinh.FI), pattern = "comp_", replacement = "asinh_")
