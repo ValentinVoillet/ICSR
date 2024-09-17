@@ -42,7 +42,7 @@ extract_CYTNUM_data <- function(gs,
 
     #- data.table()
     dt.res <- marker_response %>%
-      data.table() %>%
+      # data.table() %>%
       dplyr::mutate(FCS = rownames(flowWorkspace::pData(x))) %>%
       dplyr::mutate(BATCH = flowWorkspace::pData(x)$BATCH) %>%
       dplyr::mutate(PTID = flowWorkspace::pData(x)$PTID) %>%
@@ -51,7 +51,7 @@ extract_CYTNUM_data <- function(gs,
       dplyr::mutate(RUNNUM = flowWorkspace::pData(x)$`Run Num`) %>%
       dplyr::mutate(SAMP_ORD = flowWorkspace::pData(x)$SAMP_ORD) %>%
       dplyr::mutate(REPLICATE = flowWorkspace::pData(x)$Replicate)
-    dt.res$CYTNUM <- apply(dt.res[, ..cytokine_nodes], 1, function(x) sum(x == TRUE))
+    dt.res$CYTNUM <- apply(dt.res[, cytokine_nodes], 1, function(x) sum(x == TRUE))
 
     #- Output
     dt.output <- dt.res %>%
