@@ -21,7 +21,6 @@ extract_CYTNUM_data <- function(gs,
                                 cytokine_nodes)
 {
   ##-- Require
-  require(flowWorkspace)
   require(tidyverse)
   require(data.table)
 
@@ -29,13 +28,13 @@ extract_CYTNUM_data <- function(gs,
   ##-- Extraction
   exprs.tmp <- lapply(gs, function(x)
   {
-    cat("\t", pData(x) %>% rownames(), "\n")
+    cat("\t", flowWorkspace::pData(x) %>% rownames(), "\n")
 
     #- Get boolean positivity call for markers
     options(warn = 0)
-    marker_response <- try(lapply(c(parent_node, cytokine_nodes), function(mrkr){gh_pop_get_indices(x, mrkr)}))
+    marker_response <- try(lapply(c(parent_node, cytokine_nodes), function(mrkr){flowWorkspace::gh_pop_get_indices(x, mrkr)}))
     while(class(marker_response) == "try-error"){
-      marker_response <- try(lapply(c(parent_node, cytokine_nodes), function(mrkr){gh_pop_get_indices(x, mrkr)}))
+      marker_response <- try(lapply(c(parent_node, cytokine_nodes), function(mrkr){flowWorkspace::gh_pop_get_indices(x, mrkr)}))
     }
     names(marker_response) <- c(parent_node, cytokine_nodes)
     marker_response <- bind_rows(marker_response)
@@ -43,14 +42,14 @@ extract_CYTNUM_data <- function(gs,
     #- data.table()
     dt.res <- marker_response %>%
       data.table() %>%
-      mutate(FCS = rownames(pData(x))) %>%
-      mutate(BATCH = pData(x)$BATCH) %>%
-      mutate(PTID = pData(x)$PTID) %>%
-      mutate(STIM = pData(x)$STIM) %>%
-      mutate(VISITNO = pData(x)$VISITNO) %>%
-      mutate(RUNNUM = pData(x)$`Run Num`) %>%
-      mutate(SAMP_ORD = pData(x)$SAMP_ORD) %>%
-      mutate(REPLICATE = pData(x)$Replicate)
+      mutate(FCS = rownames(flowWorkspace::pData(x))) %>%
+      mutate(BATCH = flowWorkspace::pData(x)$BATCH) %>%
+      mutate(PTID = flowWorkspace::pData(x)$PTID) %>%
+      mutate(STIM = flowWorkspace::pData(x)$STIM) %>%
+      mutate(VISITNO = flowWorkspace::pData(x)$VISITNO) %>%
+      mutate(RUNNUM = flowWorkspace::pData(x)$`Run Num`) %>%
+      mutate(SAMP_ORD = flowWorkspace::pData(x)$SAMP_ORD) %>%
+      mutate(REPLICATE = flowWorkspace::pData(x)$Replicate)
     dt.res$CYTNUM <- apply(dt.res[, ..cytokine_nodes], 1, function(x) sum(x == TRUE))
 
     #- Output
