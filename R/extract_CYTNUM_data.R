@@ -20,16 +20,15 @@ extract_CYTNUM_data <- function(gs,
                                 parent_node,
                                 cytokine_nodes)
 {
+  ##-- Require
+  require(flowWorkspace)
+  require(tidyverse)
+  require(data.table)
 
 
   ##-- Extraction
   exprs.tmp <- lapply(gs, function(x)
   {
-    #- Require
-    require(flowWorkspace)
-    require(tidyverse)
-    require(data.table)
-
     cat("\t", pData(x) %>% rownames(), "\n")
 
     #- Get boolean positivity call for markers
@@ -44,24 +43,24 @@ extract_CYTNUM_data <- function(gs,
     #- data.table()
     dt.res <- marker_response %>%
       data.table() %>%
-      mutate(FCS = rownames(pData(x))) %>%
-      mutate(BATCH = pData(x)$BATCH) %>%
-      mutate(PTID = pData(x)$PTID) %>%
-      mutate(STIM = pData(x)$STIM) %>%
-      mutate(VISITNO = pData(x)$VISITNO) %>%
-      mutate(RUNNUM = pData(x)$`Run Num`) %>%
-      mutate(SAMP_ORD = pData(x)$SAMP_ORD) %>%
-      mutate(REPLICATE = pData(x)$Replicate)
+      dplyr::mutate(FCS = rownames(pData(x))) %>%
+      dplyr::mutate(BATCH = pData(x)$BATCH) %>%
+      dplyr::mutate(PTID = pData(x)$PTID) %>%
+      dplyr::mutate(STIM = pData(x)$STIM) %>%
+      dplyr::mutate(VISITNO = pData(x)$VISITNO) %>%
+      dplyr::mutate(RUNNUM = pData(x)$`Run Num`) %>%
+      dplyr::mutate(SAMP_ORD = pData(x)$SAMP_ORD) %>%
+      dplyr::mutate(REPLICATE = pData(x)$Replicate)
     dt.res$CYTNUM <- apply(dt.res[, ..cytokine_nodes], 1, function(x) sum(x == TRUE))
 
     #- Output
     dt.output <- dt.res %>%
-      filter(get({{parent_node}}) == TRUE) %>%
-      group_by(FCS, BATCH, PTID, STIM, VISITNO, RUNNUM, REPLICATE, SAMP_ORD) %>%
-      mutate(NSUB = n()) %>%
-      mutate(boolean_CYTNUM = factor(x = ifelse(CYTNUM >= 1, TRUE, FALSE), levels = c(TRUE, FALSE))) %>%
-      group_by(BATCH, PTID, STIM, VISITNO, RUNNUM, REPLICATE, SAMP_ORD, NSUB, boolean_CYTNUM, .drop = FALSE) %>%
-      summarize(CYTNUM = n())
+      dplyr::filter(get({{parent_node}}) == TRUE) %>%
+      dplyr::group_by(FCS, BATCH, PTID, STIM, VISITNO, RUNNUM, REPLICATE, SAMP_ORD) %>%
+      dplyr::mutate(NSUB = n()) %>%
+      dplyr::mutate(boolean_CYTNUM = factor(x = ifelse(CYTNUM >= 1, TRUE, FALSE), levels = c(TRUE, FALSE))) %>%
+      dplyr::group_by(BATCH, PTID, STIM, VISITNO, RUNNUM, REPLICATE, SAMP_ORD, NSUB, boolean_CYTNUM, .drop = FALSE) %>%
+      dplyr::summarize(CYTNUM = n())
     dt.output %>% return()
   })
 
