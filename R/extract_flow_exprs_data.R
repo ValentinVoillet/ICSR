@@ -38,7 +38,7 @@ extract_flow_exprs_data <- function(gs,
   ##-- Extraction
   exprs.tmp <- flowWorkspace::lapply(gs, function(x)
   {
-    cat("\t", pData(x) %>% rownames(), "\n")
+    cat("\t", flowWorkspace::pData(x) %>% rownames(), "\n")
 
     #- Annotation
     annotation <- data.frame(markername = flowWorkspace::markernames(x) %>% names(),
