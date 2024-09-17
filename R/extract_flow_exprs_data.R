@@ -6,7 +6,7 @@ NULL
 # Function
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-#' extract_flow_exprs
+#' extract_flow_exprs_data
 #'
 #' @param gs GatingSet Object
 #' @param output_nodes Flowjo gates
@@ -21,7 +21,7 @@ NULL
 #' @export
 #'
 #' @examples
-extract_flow_exprs <- function(gs,
+extract_flow_exprs_data <- function(gs,
                                output_nodes,
                                parent_node,
                                cytokine_nodes,
@@ -33,8 +33,6 @@ extract_flow_exprs <- function(gs,
   ##-- Require
   require(flowWorkspace)
   require(tidyverse)
-  require(doMC)
-  require(here)
   require(data.table)
 
 
@@ -51,6 +49,8 @@ extract_flow_exprs <- function(gs,
       mutate(colname = case_when(colname == "Integrin" ~ "Integrin-B7",
                                  colname == "Granzyme" ~ "Granzyme-B",
                                  colname == "GzB" ~ "Granzyme-B",
+                                 colname == "PD1" ~ "PD-1",
+                                 colname == "TNFa" ~ "TNF",
                                  .default = colname))
 
     #- Get compensated data
@@ -73,6 +73,9 @@ extract_flow_exprs <- function(gs,
 
     #- Get arcsinh trans. data
     if(do.asinh == TRUE){
+      comp.FI <- flowCore::exprs(flowWorkspace::gh_pop_get_data(x, inverse.transform = TRUE))
+      comp.FI <- comp.FI[, intersect(colnames(comp.FI), annotation$markername)]
+      colnames(comp.FI) <- paste("comp", annotation[colnames(comp.FI), "colname"], sep = "_")
       markers <- colnames(comp.FI)
       asinh.FI <- do_asinh_local(dat = comp.FI %>% as.data.table(),
                                  use.cols = markers,
@@ -95,7 +98,7 @@ extract_flow_exprs <- function(gs,
     marker_response <- bind_rows(marker_response)
 
     #- data.table()
-    dt.res <- cbind(comp.FI, biexp.FI, asinh.FI, marker_response) %>%
+    dt.res <- bind_cols(comp.FI, biexp.FI, asinh.FI, marker_response) %>%
       data.table() %>%
       mutate(FCS = rownames(pData(x))) %>%
       mutate(BATCH = pData(x)$BATCH) %>%
@@ -113,7 +116,7 @@ extract_flow_exprs <- function(gs,
       mutate(NSUB = n())
     dt.output$CYTNUM <- apply(dt.output[, cytokine_nodes], 1, function(x) sum(x == TRUE))
     cols <- c("FCS", "BATCH", "PTID", "STIM", "VISITNO", "RUNNUM", "REPLICATE", "SAMP_ORD", "NSUB", "CYTNUM",
-              colnames(dt.output)[str_detect(string = colnames(dt.output), pattern = "boolean")],
+              colnames(dt.output)[str_detect(string = colnames(dt.output), pattern = "Time")],
               colnames(dt.output)[str_detect(string = colnames(dt.output), pattern = "comp")],
               colnames(dt.output)[str_detect(string = colnames(dt.output), pattern = "biexp")],
               colnames(dt.output)[str_detect(string = colnames(dt.output), pattern = "asinh")])
