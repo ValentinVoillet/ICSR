@@ -80,7 +80,8 @@ extract_flow_exprs_data <- function(gs,
                                        use.cols = markers,
                                        cofactor = cofactor)
       markers <- colnames(asinh.FI)[str_detect(string = colnames(asinh.FI), pattern = "asinh")]
-      asinh.FI <- asinh.FI[, ..markers]
+      asinh.FI <- asinh.FI %>%
+        dplyr::select(dplyr::all_of(markers))
       colnames(asinh.FI) <- str_replace_all(string = colnames(asinh.FI), pattern = "comp_", replacement = "asinh_")
       colnames(asinh.FI) <- str_remove(string = colnames(asinh.FI), pattern = "_asinh")
     }else{
@@ -121,7 +122,7 @@ extract_flow_exprs_data <- function(gs,
     dt.output <- dt.output %>%
       dplyr::ungroup() %>%
       dplyr::filter(CYTNUM >= 1) %>%
-      dplyr::select(all_of(cols))
+      dplyr::select(dplyr::all_of(cols))
     dt.output %>% return()
   })
 
