@@ -22,35 +22,38 @@ NULL
 #'
 #' @examples
 extract_flow_exprs_data <- function(gs,
-                               output_nodes,
-                               parent_node,
-                               cytokine_nodes,
-                               do.comp = TRUE,
-                               do.biexp = TRUE,
-                               do.asinh = TRUE,
-                               cofactor = 500)
+                                    output_nodes,
+                                    parent_node,
+                                    cytokine_nodes,
+                                    do.comp = FALSE,
+                                    do.biexp = FALSE,
+                                    do.asinh = TRUE,
+                                    do.asym = TRUE,
+                                    asym_root = 2,
+                                    cofactor = 500)
 {
   ##-- Require
   require(flowWorkspace)
   require(tidyverse)
 
+  ##-- Checks
+  if(do.asinh == FALSE & do.asym == TRUE){
+    stop("do.asinh need to be TRUE when using do.asym = TRUE")
+  }
+
 
   ##-- Extraction
   exprs.tmp <- flowWorkspace::lapply(gs, function(x)
   {
-    cat("\t", flowWorkspace::pData(x) %>% rownames(), "\n")
-
     #- Annotation
     annotation <- data.frame(markername = flowWorkspace::markernames(x) %>% names(),
                              colname = sapply(X = flowWorkspace::markernames(x), FUN = function(x) str_split(string = x, pattern = " ")[[1]][1]),
                              row.names = flowWorkspace::markernames(x) %>% names()) %>%
       dplyr::mutate(colname = str_replace_all(string = colname, pattern = "/", replacement = "_")) %>%
       dplyr::mutate(colname = case_when(colname == "Integrin" ~ "Integrin-B7",
-                                        colname == "Granzyme" ~ "Granzyme-B",
-                                        colname == "GzB" ~ "Granzyme-B",
+                                        colname == "Granzyme" ~ "Granzyme-B", colname == "GzB" ~ "Granzyme-B",
                                         colname == "PD1" ~ "PD-1",
-                                        colname == "TNFa" ~ "TNF",
-                                        .default = colname))
+                                        colname == "TNFa" ~ "TNF", .default = colname))
 
     #- Get compensated data
     if(do.comp == TRUE){
@@ -71,21 +74,32 @@ extract_flow_exprs_data <- function(gs,
     }
 
     #- Get arcsinh trans. data
-    if(do.asinh == TRUE){
-      comp.FI <- flowCore::exprs(flowWorkspace::gh_pop_get_data(x, inverse.transform = TRUE))
-      comp.FI <- comp.FI[, intersect(colnames(comp.FI), annotation$markername)]
-      colnames(comp.FI) <- paste("comp", annotation[colnames(comp.FI), "colname"], sep = "_")
-      markers <- colnames(comp.FI)
-      asinh.FI <- ICSR::do_asinh_local(dat = comp.FI %>% as.data.table(),
-                                       use.cols = markers,
-                                       cofactor = cofactor)
-      markers <- colnames(asinh.FI)[str_detect(string = colnames(asinh.FI), pattern = "asinh")]
-      asinh.FI <- asinh.FI %>%
-        dplyr::select(dplyr::all_of(markers))
-      colnames(asinh.FI) <- str_replace_all(string = colnames(asinh.FI), pattern = "comp_", replacement = "asinh_")
-      colnames(asinh.FI) <- str_remove(string = colnames(asinh.FI), pattern = "_asinh")
-    }else{
+    comp.FI.tmp <- flowCore::exprs(flowWorkspace::gh_pop_get_data(x, inverse.transform = TRUE))
+    comp.FI.tmp <- comp.FI.tmp[, intersect(colnames(comp.FI.tmp), annotation$markername)]
+    colnames(comp.FI.tmp) <- paste("comp", annotation[colnames(comp.FI.tmp), "colname"], sep = "_")
+    markers <- colnames(comp.FI.tmp)
+    asinh.FI <- ICSR::do_asinh_local(dat = comp.FI.tmp %>% as.data.table(),
+                                     use.cols = markers,
+                                     cofactor = cofactor)
+    markers <- colnames(asinh.FI)[str_detect(string = colnames(asinh.FI), pattern = "asinh")]
+    asinh.FI <- asinh.FI %>%
+      dplyr::select(dplyr::all_of(markers))
+    colnames(asinh.FI) <- str_replace_all(string = colnames(asinh.FI), pattern = "comp_", replacement = "asinh_")
+    colnames(asinh.FI) <- str_remove(string = colnames(asinh.FI), pattern = "_asinh")
+    if(do.asinh == FALSE){
       asinh.FI <- NULL
+    }
+
+    #- Get arcsinh+asym trans. data
+    asym_root_2_lo <- function(x, a = 2) {
+      x <- case_when(x < (a - 1) ~ (a - abs(x-a)^(1/2)),
+                     TRUE ~ x)
+    }
+    if(do.asym == TRUE){
+      asinh.asym.FI <- apply(X = asinh.FI, MARGIN = 2, FUN = function(x) asym_root_2_lo(x = x, a = asym_root))
+      colnames(asinh.asym.FI) <- str_replace(string = colnames(asinh.asym.FI), pattern = "asinh", replacement = "asinh_asym")
+    }else{
+      asinh.asym.FI <- NULL
     }
 
     #- Get boolean positivity call for markers
@@ -98,7 +112,7 @@ extract_flow_exprs_data <- function(gs,
     marker_response <- dplyr::bind_rows(marker_response)
 
     #- data.table()
-    dt.res <- dplyr::bind_cols(comp.FI, biexp.FI, asinh.FI, marker_response) %>%
+    dt.res <- dplyr::bind_cols(comp.FI, biexp.FI, asinh.FI, asinh.asym.FI, marker_response) %>%
       dplyr::mutate(FCS = rownames(pData(x))) %>%
       dplyr::mutate(BATCH = pData(x)$BATCH) %>%
       dplyr::mutate(PTID = pData(x)$PTID) %>%
