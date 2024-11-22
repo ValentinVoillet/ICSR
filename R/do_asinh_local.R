@@ -6,7 +6,7 @@ NULL
 # Function
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-#' arcsinh transformation (from Spectre)
+#' arcsinh transformation (from Spectre R package)
 #'
 #' @param dat data.table Input sample.
 #' @param use.cols Vector of character column names – these columns will be transformed and added to the data.table as new columns.

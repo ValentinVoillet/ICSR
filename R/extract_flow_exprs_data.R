@@ -8,16 +8,19 @@ NULL
 
 #' extract_flow_exprs_data
 #'
-#' @param gs GatingSet Object
-#' @param output_nodes Flowjo gates
-#' @param parent_node Parent Flowjo gate
-#' @param cytokine_nodes Cytokine Flowjo gates
-#' @param do.comp Get compensated values
-#' @param do.biexp Get biexp transformed values using FlowJo transformation parameters
-#' @param do.asinh Get arcsinh transformed values
-#' @param cofactor Cofactor used for arcsinh transformation
+#' @param gs GatingSet Object.
+#' @param output_nodes Flowjo gates.
+#' @param parent_node Parent Flowjo gate.
+#' @param cytokine_nodes Cytokine Flowjo gates.
+#' @param do.comp Get compensated values.
+#' @param do.biexp Get biexp transformed values using FlowJo transformation parameters.
+#' @param do.asinh Get arcsinh transformed values.
+#' @param do.asinh Get arcsinh + asym transformed values.
+#' @param asym_root Root used for asym transformation. By default 2.
+#' @param cofactor Co-factor used for arcsinh transformation.
+#' @param stim_to_exclude Stimulation(s) to be removed. By default NULL.
 #'
-#' @return data.table
+#' @return data.table with pData, FlowJo positivity (positivity for each marker using the marker gates determined by the lab (FlowJo gating)), and FI.
 #' @export
 #'
 #' @examples
@@ -30,22 +33,27 @@ extract_flow_exprs_data <- function(gs,
                                     do.asinh = TRUE,
                                     do.asym = TRUE,
                                     asym_root = 2,
-                                    cofactor = 500)
+                                    cofactor = 500,
+                                    stim_to_exclude = NULL)
 {
-  ##-- Require
+  #- Require
   require(flowWorkspace)
+  require(flowCore)
   require(tidyverse)
+  require(data.table)
 
-  ##-- Checks
+  #- Checks
   if(do.asinh == FALSE & do.asym == TRUE){
-    stop("do.asinh need to be TRUE when using do.asym = TRUE")
+    stop("do.asinh need to be TRUE when using do.asym = TRUE.")
+  }
+  if(is.null(stim_to_exclude) == FALSE){
+    message(paste(stim_to_exclude, collapse = ", "), " stimulations are removed.")
   }
 
-
-  ##-- Extraction
+  #- Extraction
   exprs.tmp <- flowWorkspace::lapply(gs, function(x)
   {
-    #- Annotation
+    # Annotation
     annotation <- data.frame(markername = flowWorkspace::markernames(x) %>% names(),
                              colname = sapply(X = flowWorkspace::markernames(x), FUN = function(x) str_split(string = x, pattern = " ")[[1]][1]),
                              row.names = flowWorkspace::markernames(x) %>% names()) %>%
@@ -55,7 +63,7 @@ extract_flow_exprs_data <- function(gs,
                                         colname == "PD1" ~ "PD-1",
                                         colname == "TNFa" ~ "TNF", .default = colname))
 
-    #- Get compensated data
+    # Get compensated data
     if(do.comp == TRUE){
       comp.FI <- flowCore::exprs(flowWorkspace::gh_pop_get_data(x, inverse.transform = TRUE))
       comp.FI <- comp.FI[, intersect(colnames(comp.FI), annotation$markername)]
@@ -64,7 +72,7 @@ extract_flow_exprs_data <- function(gs,
       comp.FI <- NULL
     }
 
-    #- Get FlowJo biexp
+    # Get FlowJo biexp
     if(do.biexp == TRUE){
       biexp.FI <- flowCore::exprs(flowWorkspace::gh_pop_get_data(x, inverse.transform = FALSE))
       biexp.FI <- biexp.FI[, intersect(colnames(biexp.FI), annotation$markername)]
@@ -73,7 +81,7 @@ extract_flow_exprs_data <- function(gs,
       biexp.FI <- NULL
     }
 
-    #- Get arcsinh trans. data
+    # Get arcsinh trans. data
     comp.FI.tmp <- flowCore::exprs(flowWorkspace::gh_pop_get_data(x, inverse.transform = TRUE))
     comp.FI.tmp <- comp.FI.tmp[, intersect(colnames(comp.FI.tmp), annotation$markername)]
     colnames(comp.FI.tmp) <- paste("comp", annotation[colnames(comp.FI.tmp), "colname"], sep = "_")
@@ -90,7 +98,7 @@ extract_flow_exprs_data <- function(gs,
       asinh.FI <- NULL
     }
 
-    #- Get arcsinh+asym trans. data
+    # Get arcsinh+asym trans. data
     asym_root_2_lo <- function(x, a = 2) {
       x <- case_when(x < (a - 1) ~ (a - abs(x-a)^(1/2)),
                      TRUE ~ x)
@@ -102,7 +110,7 @@ extract_flow_exprs_data <- function(gs,
       asinh.asym.FI <- NULL
     }
 
-    #- Get boolean positivity call for markers
+    # Get boolean positivity call for markers
     options(warn = 0)
     marker_response <- try(lapply(output_nodes, function(mrkr){flowWorkspace::gh_pop_get_indices(x, mrkr)}))
     while(class(marker_response) == "try-error"){
@@ -111,7 +119,7 @@ extract_flow_exprs_data <- function(gs,
     names(marker_response) <- output_nodes
     marker_response <- dplyr::bind_rows(marker_response)
 
-    #- data.table()
+    # data.table()
     dt.res <- dplyr::bind_cols(comp.FI, biexp.FI, asinh.FI, asinh.asym.FI, marker_response) %>%
       dplyr::mutate(FCS = rownames(pData(x))) %>%
       dplyr::mutate(BATCH = pData(x)$BATCH) %>%
@@ -122,7 +130,7 @@ extract_flow_exprs_data <- function(gs,
       dplyr::mutate(REPLICATE = pData(x)$Replicate) %>%
       dplyr::mutate(SAMP_ORD = pData(x)$SAMP_ORD)
 
-    #- Output
+    # Output
     dt.output <- dt.res %>%
       dplyr::filter(get({{parent_node}}) == TRUE) %>%
       dplyr::group_by(FCS, BATCH, PTID, STIM, VISITNO, RUNNUM, REPLICATE, SAMP_ORD) %>%
@@ -140,8 +148,10 @@ extract_flow_exprs_data <- function(gs,
     dt.output %>% return()
   })
 
-
-  ##-- Output
-  dplyr::bind_rows(exprs.tmp) %>% return()
+  #- Filtering & Output
+  dplyr::bind_rows(exprs.tmp) %>%
+    dplyr::filter(!(STIM %in% stim_to_exclude)) %>%
+    data.table() %>%
+    return()
 }
 

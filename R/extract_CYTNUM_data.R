@@ -8,29 +8,29 @@ NULL
 
 #' extract_CYTNUM_data
 #'
-#' @param gs GatingSet Object
-#' @param parent_node Parent Flowjo gate
-#' @param cytokine_nodes Cytokine Flowjo gates
+#' @param gs GatingSet Object.
+#' @param parent_node Parent Flowjo gate.
+#' @param cytokine_nodes Cytokine Flowjo gates.
+#' @param stim_to_exclude Stimulation(s) to be removed. By default NULL.
 #'
-#' @return data.table
+#' @return data.table with pData and number of cytokines expressed (based on FlowJo gating positivity).
 #' @export
 #'
 #' @examples
 extract_CYTNUM_data <- function(gs,
                                 parent_node,
-                                cytokine_nodes)
+                                cytokine_nodes,
+                                stim_to_exclude = NULL)
 {
-  ##-- Require
+  #- Require
   require(flowWorkspace)
   require(tidyverse)
+  require(data.table)
 
-
-  ##-- Extraction
+  #- Extraction
   exprs.tmp <- flowWorkspace::lapply(gs, function(x)
   {
-    cat("\t", flowWorkspace::pData(x) %>% rownames(), "\n")
-
-    #- Get boolean positivity call for markers
+    # Get boolean positivity call for markers
     options(warn = 0)
     marker_response <- try(lapply(c(parent_node, cytokine_nodes), function(mrkr){flowWorkspace::gh_pop_get_indices(x, mrkr)}))
     while(class(marker_response) == "try-error"){
@@ -39,7 +39,7 @@ extract_CYTNUM_data <- function(gs,
     names(marker_response) <- c(parent_node, cytokine_nodes)
     marker_response <- dplyr::bind_rows(marker_response)
 
-    #- data.table()
+    # data.table()
     dt.res <- marker_response %>%
       dplyr::mutate(FCS = rownames(flowWorkspace::pData(x))) %>%
       dplyr::mutate(BATCH = flowWorkspace::pData(x)$BATCH) %>%
@@ -51,7 +51,7 @@ extract_CYTNUM_data <- function(gs,
       dplyr::mutate(REPLICATE = flowWorkspace::pData(x)$Replicate)
     dt.res$CYTNUM <- apply(dt.res[, cytokine_nodes], 1, function(x) sum(x == TRUE))
 
-    #- Output
+    # Output
     dt.output <- dt.res %>%
       dplyr::filter(get({{parent_node}}) == TRUE) %>%
       dplyr::group_by(FCS, BATCH, PTID, STIM, VISITNO, RUNNUM, REPLICATE, SAMP_ORD) %>%
@@ -62,8 +62,10 @@ extract_CYTNUM_data <- function(gs,
     dt.output %>% return()
   })
 
-
-  ##-- Output
-  dplyr::bind_rows(exprs.tmp) %>% return()
+  #- Filtering & Output
+  dplyr::bind_rows(exprs.tmp) %>%
+    dplyr::filter(!(STIM %in% stim_to_exclude)) %>%
+    data.table::data.table() %>%
+    return()
 }
 
