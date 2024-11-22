@@ -46,9 +46,6 @@ extract_flow_exprs_data <- function(gs,
   if(do.asinh == FALSE & do.asym == TRUE){
     stop("do.asinh need to be TRUE when using do.asym = TRUE.")
   }
-  if(is.null(stim_to_exclude) == FALSE){
-    message(paste(stim_to_exclude, collapse = ", "), " stimulations are removed.")
-  }
 
   #- Extraction
   exprs.tmp <- flowWorkspace::lapply(gs, function(x)

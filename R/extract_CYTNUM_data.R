@@ -57,7 +57,7 @@ extract_CYTNUM_data <- function(gs,
       dplyr::group_by(FCS, BATCH, PTID, STIM, VISITNO, RUNNUM, REPLICATE, SAMP_ORD) %>%
       dplyr::mutate(NSUB = n()) %>%
       dplyr::mutate(boolean_CYTNUM = factor(x = ifelse(CYTNUM >= 1, TRUE, FALSE), levels = c(TRUE, FALSE))) %>%
-      dplyr::group_by(BATCH, PTID, STIM, VISITNO, RUNNUM, REPLICATE, SAMP_ORD, NSUB, boolean_CYTNUM, .drop = FALSE) %>%
+      dplyr::group_by(FCS, BATCH, PTID, STIM, VISITNO, RUNNUM, REPLICATE, SAMP_ORD, NSUB, boolean_CYTNUM, .drop = FALSE) %>%
       dplyr::summarize(CYTNUM = n())
     dt.output %>% return()
   })

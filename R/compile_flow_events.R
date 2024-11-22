@@ -38,6 +38,11 @@ compile_flow_events <- function(gs,
                                 cofactor = 500,
                                 stim_to_exclude = NULL)
 {
+  #- Checks
+  if(is.null(stim_to_exclude) == FALSE){
+    message(paste(stim_to_exclude, collapse = ", "), " stimulations are removed.")
+  }
+
   #- Call extract_flow_exprs_data.R
   dt.exprs <- ICSR::extract_flow_exprs_data(gs = gs,
                                             output_nodes = output_nodes,
