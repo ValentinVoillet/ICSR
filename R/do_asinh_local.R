@@ -15,6 +15,7 @@ NULL
 #' @param reduce.noise This is an experimental calculation which should reduce noise from negative values. Use with caution.
 #'
 #' @return arcsinh transformed values
+#'
 #' @export
 #'
 #' @examples

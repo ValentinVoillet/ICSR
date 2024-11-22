@@ -1,0 +1,160 @@
+---
+site: workflowr::wflow_site
+params:
+  dt.exprs: dt.exprs
+  dt.cytnum: dt.cytnum
+  set_title: report_title
+  set_author: report_author
+title: "`r params$set_title`"
+author: "`r params$set_author`"
+date: "`r Sys.Date()`"
+always_allow_html: true
+editor_options: 
+  chunk_output_type: console
+---
+
+<style>
+body{text-align: justify}
+pre code, pre, code {
+  white-space: pre !important;
+  overflow-x: scroll !important;
+  word-break: keep-all !important;
+  word-wrap: initial !important;
+}
+</style>
+
+Authors: `r params$set_author`
+
+```{r global_options, echo=FALSE, message=FALSE, warning=FALSE}
+###--- Library
+library(data.table)
+library(rmarkdown)
+library(knitr)
+library(here)
+library(tidyverse)
+
+###--- Set knitr options
+# opts_chunk$set(
+#   fig.width = 14,
+#   fig.height = 10,
+#   echo = FALSE,
+#   results = "asis",
+#   warning = TRUE)
+```
+
+The purpose of this QC report is to assess the quality of the data before running clustering algorithms. Summary tables accounting for samples and unreliable data are blinded to treatment group.  
+
+
+# Summary tables of samples and readouts
+________________________________________
+
+## Data Input
+
+### Table 1 | Listing of columns (exprs)
+
+List of columns including pData, FlowJo gates and FI.  
+
+```{r table_1, echo=FALSE, message=FALSE, warning=FALSE, results="asis"}
+#- Summary
+rmarkdown::paged_table(dt.exprs, options = list(rows.print = 10))
+```
+
+### Table 2 | Listing of columns (CYTNUM & NSUB)
+
+List of columns including NSUB and CYTNUM.  
+
+```{r table_2, echo=FALSE, message=FALSE, warning=FALSE, results="asis"}
+#- Summary
+rmarkdown::paged_table(dt.cytnum %>% filter(boolean_CYTNUM == TRUE), options = list(rows.print = 10))
+```
+
+## Summary
+
+### Table 3 | Sample summary by BATCH
+
+Number of samples analyzed, by BATCH.  
+
+```{r table_3, echo=FALSE, message=FALSE, warning=FALSE, results="asis"}
+#- Summary
+dt.exprs %>%
+  group_by(BATCH, reliable_flag) %>%
+  summarise(n = length(unique(FCS))) -> tab
+rmarkdown::paged_table(tab, options = list(rows.print = 5))
+```
+
+### Table 4 | Number of cells, by BATCH
+
+Number of cells analyzed, by BATCH.  
+
+```{r table_4, echo=FALSE, message=FALSE, warning=FALSE, results="asis"}
+#- Summary
+dt.exprs %>%
+  group_by(BATCH) %>%
+  summarise(n = n()) -> tab
+rmarkdown::paged_table(tab, options = list(rows.print = 5))
+```
+
+### Table 5 | Number of cells, by SAMPLE
+
+Number of cells analyzed, by SAMPLE (.FCS)  
+
+```{r table_5, echo=FALSE, message=FALSE, warning=FALSE, results="asis"}
+#- Summary
+dt.exprs %>%
+  group_by(FCS) %>%
+  summarise(n = n()) -> tab
+rmarkdown::paged_table(tab, options = list(rows.print = 5))
+```
+
+
+# Nb. of cytokines and/or functional activation markers
+_______________________________________________________
+
+Nb. of cytokines barplot + circle plot. DO NOT FORGET TO REMOVE UNRELIABEL SAMPLES (add text mentioning that).
+
+
+
+# Distribution of transformed FI
+________________________________
+
+## asinh
+
+DO NOT FORGET TO REMOVE UNRELIABEL SAMPLES.
+
+
+## asinh + asym
+
+DO NOT FORGET TO REMOVE UNRELIABEL SAMPLES.
+
+
+```{r data_structure, echo=FALSE, message=FALSE, warning=FALSE, eval=F}
+dt = dt.exprs
+markers <- colnames(dt)[str_detect(string = colnames(dt), pattern = "asinh")]
+markers <- markers[!str_detect(string = markers, pattern = "asym")]
+for(marker in markers[1]){
+  # data.table()
+  dt.ggplot <- dt[, ..marker] #%>%
+    #mutate(marker = plyr::mapvalues(x = marker, 
+    #                                from = markers, 
+    #                                to = c("TNF-\u03B1", "IL-4", "CD154", "Granzyme B", "CD45RA", "IFN-\u03B3", "PD-1", "ICOS", "CCR7", "IL-2", "CXCR5", "IL-17a")))
+  colnames(dt.ggplot)[1] <- "value"
+  dt.ggplot$marker <- marker
+  dt.ggplot$BATCH <- dt$BATCH
+  
+  # Figure
+  dt.ggplot %>%
+    ggplot(aes(x = value, y = BATCH, fill = BATCH)) +
+      ggridges::geom_density_ridges(bandwidth = .1) +
+      geom_vline(xintercept = 0, alpha = .5) +
+      scale_x_continuous(limits = c(-8, 8)) +
+      scale_fill_viridis_d(option = "A", begin = .2) +
+      facet_wrap(~ marker) +
+      theme_bw() +
+      labs(x = NULL, y = NULL) +
+      theme(legend.position = "none", 
+            axis.title = element_text(size = 16), 
+            panel.grid = element_blank(), 
+            strip.text = element_text(size = 16)) -> plot
+  print(plot)
+}
+```

@@ -23,6 +23,7 @@ NULL
 #' @param stim_to_exclude Stimulation(s) to be removed. By default NULL.
 #'
 #' @return list with two data.table elements 'exprs' and 'cytnum'
+#'
 #' @export
 #'
 #' @examples

@@ -14,6 +14,7 @@ NULL
 #' @param stim_to_exclude Stimulation(s) to be removed. By default NULL.
 #'
 #' @return data.table with pData and number of cytokines expressed (based on FlowJo gating positivity).
+#'
 #' @export
 #'
 #' @examples

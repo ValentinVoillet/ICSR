@@ -1,66 +1,15 @@
 ###--- R script
-# CD4+ T
+library(flowCore)
 library(flowWorkspace)
+library(ICSR)
 library(tidyverse)
-library(doMC)
 library(here)
 library(data.table)
+library(doMC)
 
 
-# ml fhR/4.1.0-foss-2020b
+# ml R/4.4.0-gfbf-2023b
 
-
-#######################################
-##############--- M72 ---##############
-#######################################
-
-
-####################################################
-####################################################
-###--- Open flowWorkspace objects
-# /fh/fast/mcelrath_j/vvoillet_working/CHIL/Projects/CoVPN-3008/ICS
-folders <- list.files(path = here("data-raw", "tmpdata"), full.names = TRUE)
-gs_list <- foreach(i = folders) %do%
-{
-  cat(i, "\n")
-  gs <- load_gs(path = i)
-  gs %>% return()
-}
-dt <- enframe(gs_list, value = "flowWorkspace")
-dt$name <- folders
-dt <- dt %>%
-  mutate(phenoData = map(.x = flowWorkspace, .f = function(x) return(x %>% pData)))
-
-
-####################################################
-####################################################
-###--- Filtering - Remove duplicate samples
-#- Duplicates
-# Find duplicate samples
-batchList <- lapply(1:nrow(dt), function(i)
-{
-  unique(pData(dt$flowWorkspace[[i]])[, c("BATCH", "PTID", "VISITNO", "STIM", "Run Num", "Replicate")])
-})
-batchDF <- do.call(rbind, batchList)
-batchDF$`Run Num` <- as.numeric(as.character(batchDF$`Run Num`))
-# Create ID tag for PTID:VISITNO:STIM
-batchDF <- batchDF %>%
-  mutate(PTID.VISITNO.STIM = paste(batchDF$PTID, batchDF$VISITNO, batchDF$STIM, sep = ":")) %>%
-  arrange(PTID.VISITNO.STIM)
-batchDF <- batchDF %>%
-  group_by(PTID.VISITNO.STIM) %>%
-  mutate(duplicated = ifelse(`Run Num` == max(`Run Num`), FALSE, TRUE))
-batchDF$duplicated %>% table()
-
-#- Filtering
-bind_rows(dt$phenoData) %>%
-  filter(!(PTID %in% "CTAC0100")) %>% # Remove control samples
-  pull(sample_name) -> selected.samples
-dt <- dt %>%
-  mutate(filtering = map_chr(.x = phenoData, .f = function(x) ifelse(length(intersect(x$sample_name, selected.samples)) != 0, "Y", "N"))) %>%
-  filter(filtering == "Y") %>%
-  mutate(GatingSet.filtered = map2(.x = flowWorkspace, .y = phenoData, .f = function(x, y) x[which(y$sample_name %in% selected.samples), ] %>% return())) %>%
-  mutate(phenoData.filtered = map(.x = GatingSet.filtered, .f = function(x) return(x %>% pData)))
 
 
 ####################################################
@@ -71,101 +20,149 @@ dt <- dt %>%
 # remotes::install_github("ValentinVoillet/ICSR", force = TRUE)
 
 
-####################################################
-####################################################
-###--- extract_flow_exprs_data
-parent_node <- "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+"
-cytokine_nodes <- c("/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/153+",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/154+",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IFNg+",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL17A_OR_IL17F",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL2+",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL4_OR_IL13",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/GM-CSF+",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/TNF+")
-output_nodes <- c("/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/R7+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/4+RA+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/Naive",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/CM",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/EM",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/TEMRA",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/153+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/154+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IFNg+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL17A_OR_IL17F",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL2+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL4_OR_IL13",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/GM-CSF+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/TNF+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/CCR6+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/CXCR3+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/CXCR5+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/DR+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/Granulysin+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/Ki67+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/NKG2C+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/PD1+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/Perforin+")
-lapply(X = dt$GatingSet.filtered, FUN = function(x) {
-  ICSR::extract_flow_exprs_data(gs = x,
-                                output_nodes = output_nodes,
-                                parent_node = parent_node,
-                                cytokine_nodes = cytokine_nodes,
-                                do.comp = TRUE,
-                                do.biexp = TRUE,
-                                do.asinh = TRUE,
-                                cofactor = 500) %>%
-    return()}) %>%
-  bind_rows() -> dt.results
-dt.results_old <- readRDS(file = "/fh/fast/mcelrath_j/vvoillet_working/CHIL/Projects/M72_ID52-Frahm-Pilot/ICS/data/001_dt_CD4+T_1-of-8-cytokines(1).rds")
+
+###########################################################
+##############--- CoVPN-3008 Case/Control ---##############
+###########################################################
 
 
 ####################################################
 ####################################################
-###--- extract_CYTNUM_data
-parent_node <- "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+"
-cytokine_nodes <- c("/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/153+",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/154+",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IFNg+",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL17A_OR_IL17F",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL2+",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL4_OR_IL13",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/GM-CSF+",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/TNF+")
-lapply(X = dt$GatingSet.filtered, FUN = function(x) {
-  ICSR::extract_CYTNUM_data(gs = x,
-                            parent_node = parent_node,
-                            cytokine_nodes = cytokine_nodes) %>%
-    return()}) %>%
-  bind_rows() -> dt.results
-dt.results_old <- readRDS(file = "/fh/fast/mcelrath_j/vvoillet_working/CHIL/Projects/M72_ID52-Frahm-Pilot/ICS/data/001_dt_CD4+T_1-of-8-cytokines(2).rds")
+###--- Open flowWorkspace objects
+# /fh/fast/mcelrath_j/vvoillet_working/CHIL/Projects/CoVPN-3008/ICS_Case-Control
+folders <- list.files(path = here("data-raw", "tmpdata"), full.names = TRUE, pattern = "22")
+gs_list <- foreach(i = folders) %do%
+{
+  cat(i, "\n")
+  gs <- load_gs(path = i)
+  pData(gs)$BATCH <- pData(gs)$Batch
+  gs %>% return()
+}
 
 
 ####################################################
 ####################################################
-library(MIMOSA)
+###--- compile_flow_events.R
+parent_node <- "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+"
+cytokine_nodes <- c("/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IFNg+",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL2+",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL4+",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL5_OR_IL13+",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL17a+",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL21+",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/154+",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/TNFa+")
+output_nodes <- c("/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/CCR7+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/4+45RA+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/N",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/CM",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/EM",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/TEMRA",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IFNg+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL2+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL4+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL5_OR_IL13+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL17a+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL21+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/154+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/TNFa+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/GzB+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/Perf+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/25+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/PD1+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/CCR6+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/CXCR3+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/CXCR5+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/Ki67+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/FoxP3+")
+#- Processing
+list.res <- lapply(X = gs_list, FUN = function(x) {
+  message(pData(x)$BATCH %>% unique())
+  compile_flow_events(gs = x,
+                      output_nodes = output_nodes,
+                      parent_node = parent_node,
+                      cytokine_nodes = cytokine_nodes,
+                      do.comp = FALSE,
+                      do.biexp = FALSE,
+                      do.asinh = TRUE,
+                      do.asym = TRUE,
+                      cofactor = 500,
+                      stim_to_exclude = "sebctrl") %>%
+    return()})
 
-###--- runMIMOSA
-inFileName <- here::here("output", "001_output", "in-mimosaSet.csv")
-outFileName <- here::here("output", "001_output", "out-mimosaSet.csv")
-ICSR::runMIMOSA(INFILE = inFileName, OUTFILE = outFileName)
+#- Checks
+# list.res[[1]]$exprs %>% head()
+# list.res[[1]]$cytnum %>% head()
+
+#- Output
+saveRDS(object = list.res, file = here("data", "raw_test.rds"))
 
 
 ####################################################
 ####################################################
-###--- leiden_local
-library(tidyverse)
-library(here)
-library(data.table)
-library(doMC)
-library(Rphenograph)
-library(leiden)
+###--- Filtering
+#- Unreliable
+unreliable.s <- readxl::read_xlsx("~/Documents/CHIL/CoVPN-3008/ICS_Case-Control/misc-docs/CoVPN 3008 Case Cohort_Unreliable data_16NOV23_A_modified_08FEB2024.xlsx")
+unreliable.s <- unreliable.s[2:nrow(unreliable.s), ]
+unreliable.s %>%
+  filter(`Unreliable Stim` == "ALL") %>%
+  mutate(SAMPLE = paste(`Batch #`, PTID, VISITNO, `Run Num`, sep = "_")) %>%
+  pull(SAMPLE) -> unreliable.s_1
+unreliable.s %>%
+  filter(!(`Unreliable Stim` %in% c("ALL", "negctrl"))) %>%
+  mutate(SAMPLE = paste(`Batch #`, PTID, VISITNO, `Run Num`, "1", `Unreliable Stim`, sep = "_")) %>%
+  pull(SAMPLE) -> unreliable.s_2
 
-#- Data
-load(here("output", "001_output", "001_High-Dimensional-ICS-Analysis_CD4+T.RData"))
+#- dt
+list.res.raw <- readRDS(file = "tests/data/raw_test.rds")
+lapply(X = list.res.raw, function(x) x$exprs) %>%
+  bind_rows() -> dt.exprs.raw
+lapply(X = list.res.raw, function(x) x$cytnum) %>%
+  bind_rows() -> dt.cytnum.raw
 
-#- Leiden (asinh_asym)
-markers <- colnames(dt)[str_detect(string = colnames(dt), pattern = "asinh_asym")]
-partition.i <- ICSR::leiden_local(data = dt, markers = markers, k = 30, seed = 1234, niter = 100, res = 0.1)
+#- Filtering - dt.exprs
+dt.MTL <- readxl::read_xlsx("~/Documents/CHIL/CoVPN-3008/ICS_Case-Control/misc-docs/CoVPN3008 Cases_MTL_A_14Sep23_VV.xlsx")
+colnames(dt.MTL)[1] <- "BATCH"
+colnames(dt.MTL)[10] <- "RUNNUM"
+do_filtering(dt = dt.exprs.raw,
+             remove_dup = TRUE,
+             dt.MTL_dup = dt.MTL,
+             remove_participants = TRUE,
+             participants_list = "CTAC0036",
+             remove_nsub = FALSE,
+             cutoff_nsub = NULL,
+             flag_unreliable = TRUE,
+             unreliable_list_all = unreliable.s_1,
+             unreliable_list_by_stim = unreliable.s_2) -> dt.exprs
+dt.exprs$reliable_flag %>% table() # 504 & 195069
+dim(dt_old_filt) # 195069
+dt.exprs %>%
+  filter(reliable_flag == 1) -> dt.exprs
+identical(paste(dt.exprs$FCS, dt.exprs$`/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/25+`),
+          paste(dt_old_filt$FCS, dt_old_filt$`/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/25+`))  # TRUE
+
+#- Filtering - dt.cytnum
+do_filtering(dt = dt.cytnum.raw,
+             remove_dup = TRUE,
+             dt.MTL_dup = dt.MTL,
+             remove_participants = TRUE,
+             participants_list = "CTAC0036",
+             remove_nsub = FALSE,
+             cutoff_nsub = NULL,
+             flag_unreliable = TRUE,
+             unreliable_list_all = unreliable.s_1,
+             unreliable_list_by_stim = unreliable.s_2) -> dt.cytnum
+
+
+####################################################
+####################################################
+###--- QC
+create_report_QC_ICS(dt.exprs = dt.exprs,
+                     dt.cytnum = dt.cytnum,
+                     output_dir = "tests/",
+                     report_title = "CHIL ICS QC Report",
+                     report_author = "Valentin Voillet")
+
+
 

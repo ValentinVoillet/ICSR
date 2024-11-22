@@ -21,6 +21,7 @@ NULL
 #' @param stim_to_exclude Stimulation(s) to be removed. By default NULL.
 #'
 #' @return data.table with pData, FlowJo positivity (positivity for each marker using the marker gates determined by the lab (FlowJo gating)), and FI.
+#'
 #' @export
 #'
 #' @examples
