@@ -42,7 +42,7 @@ create_report_QC_ICS <- function(dt.exprs,
 
   #- Get directory of report markdown template
   # report_dir <- ("rmd_template/QC_report.rmd")
-  report_dir <- system.file("inst/rmd_template/QC_report.rmd", package = "ICSR") ### need to see how to do it as in dataexplorer
+  report_dir <- system.file("rmd_template/QC_report.rmd", package = "ICSR") ### need to see how to do it as in dataexplorer
 
   #- Render report into html
   suppressWarnings(rmarkdown::render(
