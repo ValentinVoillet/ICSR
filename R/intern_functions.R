@@ -91,13 +91,14 @@ x_axis <- function(dt.boolean, order = NULL) {
     dplyr::summarise(annot = paste0("40% (", paste0(variable, collapse = ""), ")"))
 
   #- Output
-  dt.annotation <- merge(x = pos80lbl, y = pos60lbl, by = "cluster")
-  dt.annotation <- merge(x = dt.annotation, y = pos40lbl, by = "cluster")
+  dt.annotation <- merge(x = pos80lbl, y = pos60lbl, by = "cluster", all = TRUE)
+  dt.annotation <- merge(x = dt.annotation, y = pos40lbl, by = "cluster", all = TRUE)
   annotation <- dt.annotation %>%
     mutate(axis.text = paste(cluster, annot.x, annot.y, annot, sep = "\n")) %>%
     mutate(axis.text = str_remove(string = axis.text, pattern = "80% [(][])]\n")) %>%
     mutate(axis.text = str_remove(string = axis.text, pattern = "60% [(][])]\n")) %>%
     mutate(axis.text = str_remove(string = axis.text, pattern = "40% [(][])]")) %>%
+    mutate(axis.text = str_remove(string = axis.text, pattern = "\nNA")) %>%
     mutate(cluster = factor(x = cluster, levels = order)) %>%
     arrange(cluster) %>%
     pull(axis.text)
