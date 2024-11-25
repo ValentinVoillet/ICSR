@@ -47,7 +47,7 @@ leiden_local <- function(data, markers, k = 30, res = 1, niter = 10, seed = 1234
   colnames(relations) <- c("from", "to", "weight")
 
   #- iGraph
-  g <- igraph::graph.data.frame(relations, directed = FALSE)
+  g <- igraph::graph_from_data_frame(relations, directed = FALSE)
 
   #- Leiden community
   set.seed(seed)
