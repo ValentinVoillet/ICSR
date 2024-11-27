@@ -8,18 +8,18 @@ NULL
 
 #' Filtering
 #'
-#' @param dt input data.table. Including FI.
-#' @param remove_dup Remove duplicates (based on RUNNUM).
-#' @param dt.MTL_dup Master thaw list to remove duplicates (based on RUNNUM). Needs BATCH, SAMP_ORD, PTID, VISITNO and RUNNUM.
-#' @param remove_participants Remove participants, e.g. control participants.
+#' @param dt input data.table. Including pData and fluorescence intensities (FI).
+#' @param remove_dup TRUE or FALSE. If TRUE, remove duplicates (based on RUNNUM).
+#' @param dt.MTL_dup Master thaw list to remove duplicates (based on RUNNUM). Need BATCH, SAMP_ORD, PTID, VISITNO and RUNNUM.
+#' @param remove_participants TRUE or FALSE. If TRUE, remove participants, e.g. control participants.
 #' @param participants_list Vector of removed participants.
-#' @param remove_nsub Remove samples based on total number of cells. Ex: 10,000 CD4+ T.
+#' @param remove_nsub TRUE or FALSE. If TRUE, remove samples based on total number of cells. Ex: 10,000 CD4+ T.
 #' @param cutoff_nsub Cut-off for `remove_nsub`. Ex: 10,000 CD4+ T.
-#' @param flag_unreliable Flag unreliable samples. By default FALSE. If TRUE, needs unreliable lists.
-#' @param unreliable_list_all Vector of unreliable samples. Unreliable sample level must be BATCH_PTID_VISITNO_RUNNUM_REPLICATE. Use with caution.
+#' @param flag_unreliable TRUE or FALSE. Flag unreliable samples. If TRUE, need unreliable lists.
+#' @param unreliable_list_all Vector of unreliable samples. Unreliable sample level must be BATCH_PTID_VISITNO_RUNNUM. Use with caution.
 #' @param unreliable_list_by_stim Vector of unreliable samples. Unreliable sample level must be BATCH_PTID_VISITNO_RUNNUM_REPLICATE_STIM. Use with caution.
 #'
-#' @return data.table after filtering
+#' @return data.table with pData, FlowJo positivity (positivity for each marker using the marker gates determined by the lab (FlowJo gating)), and FI after filtering.
 #'
 #' @export
 #'
@@ -35,13 +35,23 @@ do_filtering <- function(dt,
                          flag_unreliable = FALSE,
                          unreliable_list_all = NULL,
                          unreliable_list_by_stim = NULL) {
+  #- Require
+  require(tidyverse)
+
+  #- Checks
+  if(remove_dup == TRUE & is.null(dt.MTL_dup)){
+    stop("do_filtering needs Master Thaw List to remove duplicates.")
+  }
+
   #- Summary - duplicates
   # Needs MTL file
-  batch.df <- dt.MTL_dup %>%
-    dplyr::select(BATCH, SAMP_ORD, PTID, VISITNO, RUNNUM)
-  batch.df <- batch.df %>%
-    dplyr::group_by(PTID, VISITNO) %>%
-    dplyr::mutate(dup = ifelse(RUNNUM == max(RUNNUM), FALSE, TRUE))
+  if(!is.null(dt.MTL_dup)){
+    batch.df <- dt.MTL_dup %>%
+      dplyr::select(BATCH, SAMP_ORD, PTID, VISITNO, RUNNUM)
+    batch.df <- batch.df %>%
+      dplyr::group_by(PTID, VISITNO) %>%
+      dplyr::mutate(dup = ifelse(RUNNUM == max(RUNNUM), FALSE, TRUE))
+  }
 
   #- Remove duplicates
   if(remove_dup == TRUE){

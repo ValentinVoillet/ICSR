@@ -11,9 +11,10 @@ NULL
 #' This function creates a data QC report.
 #' @param dt.exprs input data.table. Including FI.
 #' @param dt.cytnum input data.table. Including # of cytokines per sample.
-#' @param cytokine_nodes Cytokine Flowjo gates.
+#' @param cytokine_nodes Cytokine Flowjo gates. By default, NULL.
+#' @param markers List of markers (ridge plots). By default, NULL.
 #' @param output_format output format in \link{render}. Default is \code{html_document(toc = TRUE, toc_depth = 6, theme = "yeti")}.
-#' @param output_file output file name in \link{render}. Default is "report.html".
+#' @param output_file output file name in \link{render}. Default is "ICS_QC_report.html".
 #' @param output_dir output directory for report in \link{render}. Default is user's current directory.
 #' @param report_title report title. Default is "ICS QC Report".
 #' @param report_author report authors. Default is NULL.
@@ -41,8 +42,8 @@ create_report_QC_ICS <- function(dt.exprs,
   if(!data.table::is.data.table(dt.cytnum)) dt.cytnum <- data.table::data.table(dt.cytnum)
 
   #- Get directory of report markdown template
-  # report_dir <- ("rmd_template/QC_report.rmd")
-  report_dir <- system.file("rmd_template/QC_report.rmd", package = "ICSR") ### need to see how to do it as in dataexplorer
+  # report_dir <- ("inst/rmd_template/QC_report.rmd")
+  report_dir <- system.file("rmd_template/QC_report.rmd", package = "ICSR")
 
   #- Render report into html
   suppressWarnings(rmarkdown::render(

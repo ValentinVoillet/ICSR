@@ -8,13 +8,13 @@ NULL
 
 #' create_gating_set
 #'
-#' @param assayid BATCH.
-#' @param xml_path xml path.
+#' @param assayid `numeric` or `character`. batch ID: used for merging Master thaw list and `pData()`.
+#' @param xml_path xml path (FlowJo .xml).
 #' @param fcs_path fcs path.
-#' @param batchData dt.MTL_dup Master thaw list. Needs BATCH, SAMP_ORD, PTID, VISITNO and RUNNUM.
+#' @param batchData Master thaw list. Need BATCH, SAMP_ORD, PTID, VISITNO and RUNNUM.
 #' @param sample_name `numeric` or `character`. The name or index of the group of samples to be imported.
 #' @param xml_keywords `character` vector specifying the keywords to be extracted as pData of GatingSet.
-#' @param output_path Path - to save GatingSet obj.
+#' @param output_path Output path for the new GatingSet object.
 #'
 #' @return GatingSet R obj.
 #'
@@ -30,8 +30,6 @@ create_gating_set <- function(assayid,
                               output_path = NULL) {
 
   #- Require
-  require(tidyverse)
-  require(here)
   require(CytoML)
   require(flowWorkspace)
 

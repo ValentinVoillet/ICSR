@@ -118,8 +118,8 @@ runMIMOSA <- function(INFILE = NULL,
   # Below we loop on leiden, so that's also a separate model per leiden.
 
   #- MIMOSA
-  # NOTE: called separately for each cluster (Daryl: was done for each cytokine (IL2_or_IFNg, etc..).
-  # Here, we consider that clusters are different combinations of cytokines/markers.)
+  # NOTE: called separately for each cluster (Daryl: it was done for each cytokine (IL2_or_IFNg, etc..)).
+  # Here, we consider that clusters are different combinations of cytokines/markers.
   # Each element of result is a MIMOSAResultList (a list of MIMOSAResult's) the MIMOSAResultList has one element for each combo of stratification vars
   result <- NULL
   for(ck in CLUSTERS)

@@ -13,6 +13,8 @@ date: "`r Sys.Date()`"
 always_allow_html: true
 editor_options: 
   chunk_output_type: console
+output: html_document 
+runtime: shiny
 ---
 
 <style>
@@ -156,45 +158,47 @@ dt.ggplot %>%
 
 ```{r plot_2, echo=FALSE, message=FALSE, warning=FALSE, fig.width=4.5, fig.height=4.5}
 ###--- Barplot
-for(i in cytokine_nodes) {
-  if("reliable_flag" %in% colnames(dt.exprs)) {
-    dt.ggplot <- dt.exprs %>%
-      dplyr::filter(reliable_flag == 1) %>%
-      dplyr::filter(get({{i}}) == TRUE) %>%
-      dplyr::select(CYTNUM, i) %>%
-      dplyr::mutate(CYTNUM = case_when(CYTNUM >= 3 ~ ">=3", .default = as.character(CYTNUM))) %>%
-      dplyr::group_by(CYTNUM) %>%
-      dplyr::summarize(n = n())
-  }else{
-    dt.ggplot <- dt.exprs %>%
-      dplyr::filter(get({{i}}) == TRUE) %>%
-      dplyr::select(CYTNUM, i) %>%
-      dplyr::mutate(CYTNUM = case_when(CYTNUM >= 3 ~ ">=3", .default = as.character(CYTNUM))) %>%
-      dplyr::group_by(CYTNUM) %>%
-      dplyr::summarize(n = n())
+if(!is.null(cytokine_nodes)){
+  for(i in cytokine_nodes) {
+    if("reliable_flag" %in% colnames(dt.exprs)) {
+      dt.ggplot <- dt.exprs %>%
+        dplyr::filter(reliable_flag == 1) %>%
+        dplyr::filter(get({{i}}) == TRUE) %>%
+        dplyr::select(CYTNUM, i) %>%
+        dplyr::mutate(CYTNUM = case_when(CYTNUM >= 3 ~ ">=3", .default = as.character(CYTNUM))) %>%
+        dplyr::group_by(CYTNUM) %>%
+        dplyr::summarize(n = n())
+    }else{
+      dt.ggplot <- dt.exprs %>%
+        dplyr::filter(get({{i}}) == TRUE) %>%
+        dplyr::select(CYTNUM, i) %>%
+        dplyr::mutate(CYTNUM = case_when(CYTNUM >= 3 ~ ">=3", .default = as.character(CYTNUM))) %>%
+        dplyr::group_by(CYTNUM) %>%
+        dplyr::summarize(n = n())
+    }
+    sum <- sum(dt.ggplot$n)
+    dt.ggplot <- dt.ggplot %>%
+      dplyr::mutate(percent = round(n / sum * 100, 2)) %>%
+      dplyr::mutate(CYTNUM = factor(x = CYTNUM, levels = c("1", "2", ">=3"))) %>%
+      dplyr::arrange(desc(CYTNUM))
+    dt.ggplot %>%
+      ggplot(aes(x = "", y = percent)) +
+        geom_bar(aes(fill = CYTNUM), stat = "identity", width = 1) +
+        geom_label(aes(label = percent),
+                   position = position_stack(vjust = 0.5),
+                   show.legend = FALSE) +
+        coord_polar("y", start = 0) +
+        scale_fill_viridis_d() +
+        labs(x = NULL, y = NULL, title = i) + 
+        theme_bw() +
+        theme(plot.title = element_text(size = 8),
+              axis.title = element_blank(),
+              axis.text = element_blank(),
+              axis.ticks = element_blank(),
+              panel.grid = element_blank()) -> plot 
+    plot %>%
+      print()
   }
-  sum <- sum(dt.ggplot$n)
-  dt.ggplot <- dt.ggplot %>%
-    dplyr::mutate(percent = round(n / sum * 100, 2)) %>%
-    dplyr::mutate(CYTNUM = factor(x = CYTNUM, levels = c("1", "2", ">=3"))) %>%
-    dplyr::arrange(desc(CYTNUM))
-  dt.ggplot %>%
-    ggplot(aes(x = "", y = percent)) +
-      geom_bar(aes(fill = CYTNUM), stat = "identity", width = 1) +
-      geom_label(aes(label = percent),
-                 position = position_stack(vjust = 0.5),
-                 show.legend = FALSE) +
-      coord_polar("y", start = 0) +
-      scale_fill_viridis_d() +
-      labs(x = NULL, y = NULL, title = i) + 
-      theme_bw() +
-      theme(plot.title = element_text(size = 8),
-            axis.title = element_blank(),
-            axis.text = element_blank(),
-            axis.ticks = element_blank(),
-            panel.grid = element_blank()) -> plot 
-  plot %>%
-    print()
 }
 ```
 
@@ -207,29 +211,32 @@ ________________________________
 ```{r data_structure_1, echo=FALSE, message=FALSE, warning=FALSE, fig.width=4, fig.height=7, results='asis'}
 ###--- QC
 #- if condition
-markers.tmp <- markers[str_detect(string = markers, pattern = "biexp")]
-if(length(markers.tmp) == 0){
-  print("No biexp values")
+if(!is.null(markers)){
+  markers.tmp <- markers[str_detect(string = markers, pattern = "biexp")]
+  if(length(markers.tmp) == 0){
+    print("No biexp values")
+  }
 }
 
 #- Ridge plots by BATCH
-markers.tmp <- markers[str_detect(string = markers, pattern = "biexp")]
-for(marker in markers.tmp){
-  # data.table()
-  if("reliable_flag" %in% colnames(dt.exprs)) {
-    dt.ggplot <- dt.exprs %>%
-      dplyr::filter(reliable_flag == 1) %>%
-      dplyr::select(marker, BATCH)
-  }else{
-    dt.ggplot <- dt.exprs %>%
-      dplyr::select(marker, BATCH)
-  }
-  colnames(dt.ggplot)[1] <- "value"
-  dt.ggplot$marker <- marker
+if(!is.null(markers)){
+  markers.tmp <- markers[str_detect(string = markers, pattern = "biexp")]
+  for(marker in markers.tmp){
+    # data.table()
+    if("reliable_flag" %in% colnames(dt.exprs)) {
+      dt.ggplot <- dt.exprs %>%
+        dplyr::filter(reliable_flag == 1) %>%
+        dplyr::select(marker, BATCH)
+    }else{
+      dt.ggplot <- dt.exprs %>%
+        dplyr::select(marker, BATCH)
+    }
+    colnames(dt.ggplot)[1] <- "value"
+    dt.ggplot$marker <- marker
   
-  # Figure
-  dt.ggplot %>%
-    ggplot() +
+    # Figure
+    dt.ggplot %>%
+      ggplot() +
       ggridges::geom_density_ridges(aes(x = value, y = BATCH, fill = BATCH), bandwidth = .1, lwd = .25) +
       geom_point(aes(x = value, y = BATCH), data = dt.ggplot %>% filter(value < -4500), pch = "|") +
       geom_vline(xintercept = 0, alpha = .5, lwd = .25, lty = 2) +
@@ -242,7 +249,8 @@ for(marker in markers.tmp){
             axis.title = element_text(size = 16), 
             panel.grid = element_blank(), 
             strip.text = element_text(size = 16)) -> plot
-  print(plot)
+    print(plot)
+  }
 }
 ```
 
@@ -251,31 +259,34 @@ for(marker in markers.tmp){
 ```{r data_structure_2, echo=FALSE, message=FALSE, warning=FALSE, fig.width=4, fig.height=7, results='asis'}
 ###--- QC
 #- if condition
-markers.tmp <- markers[str_detect(string = markers, pattern = "asinh")]
-markers.tmp <- markers.tmp[!str_detect(string = markers.tmp, pattern = "asym")]
-if(length(markers.tmp) == 0){
-  print("No asinh values")
-}
+if(!is.null(markers)){
+  markers.tmp <- markers[str_detect(string = markers, pattern = "asinh")]
+  markers.tmp <- markers.tmp[!str_detect(string = markers.tmp, pattern = "asym")]
+  if(length(markers.tmp) == 0){
+    print("No asinh values")
+  }
+}  
 
 #- Ridge plots by BATCH
-markers.tmp <- markers[str_detect(string = markers, pattern = "asinh")]
-markers.tmp <- markers.tmp[!str_detect(string = markers.tmp, pattern = "asym")]
-for(marker in markers.tmp){
-  # data.table()
-  if("reliable_flag" %in% colnames(dt.exprs)) {
-    dt.ggplot <- dt.exprs %>%
-      dplyr::filter(reliable_flag == 1) %>%
-      dplyr::select(marker, BATCH)
-  }else{
-    dt.ggplot <- dt.exprs %>%
-      dplyr::select(marker, BATCH)
-  }
-  colnames(dt.ggplot)[1] <- "value"
-  dt.ggplot$marker <- marker
+if(!is.null(markers)){
+  markers.tmp <- markers[str_detect(string = markers, pattern = "asinh")]
+  markers.tmp <- markers.tmp[!str_detect(string = markers.tmp, pattern = "asym")]
+  for(marker in markers.tmp){
+    # data.table()
+    if("reliable_flag" %in% colnames(dt.exprs)) {
+      dt.ggplot <- dt.exprs %>%
+        dplyr::filter(reliable_flag == 1) %>%
+        dplyr::select(marker, BATCH)
+    }else{
+      dt.ggplot <- dt.exprs %>%
+        dplyr::select(marker, BATCH)
+    }
+    colnames(dt.ggplot)[1] <- "value"
+    dt.ggplot$marker <- marker
   
-  # Figure
-  dt.ggplot %>%
-    ggplot() +
+    # Figure
+    dt.ggplot %>%
+      ggplot() +
       ggridges::geom_density_ridges(aes(x = value, y = BATCH, fill = BATCH), bandwidth = .1, lwd = .25) +
       geom_point(aes(x = value, y = BATCH), data = dt.ggplot %>% filter(value < -3), pch = "|") +
       geom_vline(xintercept = 0, alpha = .5, lwd = .25, lty = 2) +
@@ -288,7 +299,8 @@ for(marker in markers.tmp){
             axis.title = element_text(size = 16), 
             panel.grid = element_blank(), 
             strip.text = element_text(size = 16)) -> plot
-  print(plot)
+    print(plot)
+  }
 }
 ```
 
@@ -297,29 +309,32 @@ for(marker in markers.tmp){
 ```{r data_structure_3, echo=FALSE, message=FALSE, warning=FALSE, fig.width=4, fig.height=7, results='asis'}
 ###--- QC
 #- if condition
-markers.tmp <- markers[str_detect(string = markers, pattern = "asinh_asym")]
-if(length(markers.tmp) == 0){
-  print("No asinh+asym values")
+if(!is.null(markers)){
+  markers.tmp <- markers[str_detect(string = markers, pattern = "asinh_asym")]
+  if(length(markers.tmp) == 0){
+    print("No asinh+asym values")
+  }
 }
 
 #- Ridge plots by BATCH
-markers.tmp <- markers[str_detect(string = markers, pattern = "asinh_asym")]
-for(marker in markers.tmp){
-  # data.table()
-  if("reliable_flag" %in% colnames(dt.exprs)) {
-    dt.ggplot <- dt.exprs %>%
-      dplyr::filter(reliable_flag == 1) %>%
-      dplyr::select(marker, BATCH)
-  }else{
-    dt.ggplot <- dt.exprs %>%
-      dplyr::select(marker, BATCH)
-  }
-  colnames(dt.ggplot)[1] <- "value"
-  dt.ggplot$marker <- marker
+if(!is.null(markers)){
+  markers.tmp <- markers[str_detect(string = markers, pattern = "asinh_asym")]
+  for(marker in markers.tmp){
+    # data.table()
+    if("reliable_flag" %in% colnames(dt.exprs)) {
+      dt.ggplot <- dt.exprs %>%
+        dplyr::filter(reliable_flag == 1) %>%
+        dplyr::select(marker, BATCH)
+    }else{
+      dt.ggplot <- dt.exprs %>%
+        dplyr::select(marker, BATCH)
+    }
+    colnames(dt.ggplot)[1] <- "value"
+    dt.ggplot$marker <- marker
   
-  # Figure
-  dt.ggplot %>%
-    ggplot() +
+    # Figure
+    dt.ggplot %>%
+      ggplot() +
       ggridges::geom_density_ridges(aes(x = value, y = BATCH, fill = BATCH), bandwidth = .1, lwd = .25) +
       geom_point(aes(x = value, y = BATCH), data = dt.ggplot %>% filter(value < -0.236068), pch = "|") +
       geom_vline(xintercept = 0.5857864, alpha = .5, lwd = .25, lty = 2) +
@@ -332,7 +347,8 @@ for(marker in markers.tmp){
             axis.title = element_text(size = 16), 
             panel.grid = element_blank(), 
             strip.text = element_text(size = 16)) -> plot
-  print(plot)
-}
+    print(plot)
+  }
+}  
 ```
 

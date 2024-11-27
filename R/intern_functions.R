@@ -13,6 +13,9 @@ NULL
 #'
 #' @examples
 dt.ggplot_boolean <- function(dt, flowjo_gates, cluster_col = "Leiden"){
+  #- Require
+  require(tidyverse)
+
   #- n's
   dt.summary.tmp <- dt %>%
     dplyr::group_by(get({{cluster_col}})) %>%
@@ -41,7 +44,7 @@ dt.ggplot_boolean <- function(dt, flowjo_gates, cluster_col = "Leiden"){
 #' dt.ggplot_MFI
 #'
 #' @param dt data.table Input sample.
-#' @param markers List of markers - MFI calculation.
+#' @param markers List of markers used for MFI calculation.
 #' @param cluster_col Cluster column.
 #'
 #' @return data.table with MFI
@@ -49,6 +52,9 @@ dt.ggplot_boolean <- function(dt, flowjo_gates, cluster_col = "Leiden"){
 #'
 #' @examples
 dt.ggplot_MFI <- function(dt, markers, cluster_col = "Leiden"){
+  #- Require
+  require(tidyverse)
+
   #- MFI
   dt.tmp <- dt %>%
     dplyr::ungroup() %>%
@@ -67,13 +73,16 @@ dt.ggplot_MFI <- function(dt, markers, cluster_col = "Leiden"){
 #' x_axis
 #'
 #' @param dt.boolean data.table boolean input.
-#' @param order cluster order to follow.
+#' @param order cluster order to follow. By default, NULL.
 #'
-#' @return Vector for x axis.
+#' @return Vector for x axis corresponding to Flowjo based marker annotation.
 #' @export
 #'
 #' @examples
 x_axis <- function(dt.boolean, order = NULL) {
+  #- Require
+  require(tidyverse)
+
   #- 80%, 60% and 40%
   pos80lbl <- dt.boolean %>%
     dplyr::filter(marker_positivity >= 80) %>%

@@ -10,10 +10,10 @@ NULL
 #'
 #' @param dt data.table Input sample.
 #' @param flowjo_gates flowJo gates.
-#' @param markers List of markers - MFI calculation.
+#' @param markers List of markers used for MFI calculation.
 #' @param cluster_col Cluster column.
-#' @param level_marker marker order to follow.
-#' @param order cluster order to follow.
+#' @param level_marker Marker order to follow.
+#' @param order Cluster order to follow.
 #'
 #' @return UMAP embeddings
 #' @export

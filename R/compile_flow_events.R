@@ -14,10 +14,10 @@ NULL
 #' @param output_nodes Flowjo gates.
 #' @param parent_node Parent Flowjo gate.
 #' @param cytokine_nodes Cytokine Flowjo gates.
-#' @param do.comp Get compensated values.
-#' @param do.biexp Get biexp transformed values using FlowJo transformation parameters.
-#' @param do.asinh Get arcsinh transformed values.
-#' @param do.asinh Get arcsinh + asym transformed values.
+#' @param do.comp TRUE or FALSE. If TRUE, get compensated values.
+#' @param do.biexp TRUE or FALSE. If TRUE, get biexp transformed values using FlowJo transformation parameters.
+#' @param do.asinh TRUE or FALSE. If TRUE, get arcsinh transformed values.
+#' @param do.asinh TRUE or FALSE. If TRUE, get arcsinh + asym transformed values.
 #' @param asym_root Root used for asym transformation. By default 2.
 #' @param cofactor Co-factor used for arcsinh transformation.
 #' @param stim_to_exclude Stimulation(s) to be removed. By default NULL.
