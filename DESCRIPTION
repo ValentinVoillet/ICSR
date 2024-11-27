@@ -9,3 +9,17 @@ Description: More about what it does (maybe more than one line)
 License: What license is it under?
 Encoding: UTF-8
 LazyData: true
+RoxygenNote: 7.3.2
+Collate: 
+    'UMAP_local.R'
+    'extract_CYTNUM_data.R'
+    'do_asinh_local.R'
+    'extract_flow_exprs_data.R'
+    'compile_flow_events.R'
+    'create_gating_set.R'
+    'create_report_QC_ICS.R'
+    'do_filtering.R'
+    'dotplot_annotation.R'
+    'intern_functions.R'
+    'leiden_local.R'
+    'runMIMOSA.R'
