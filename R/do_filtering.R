@@ -78,8 +78,8 @@ do_filtering <- function(dt,
   #- Flag unreliable
   if(flag_unreliable == TRUE){
     dt <- dt %>%
-      dplyr::mutate(reliable_flag = dplyr::case_when(paste(BATCH, PTID, VISITNO, RUNNUM, sep = "_") %in% unreliable.s_1 ~ "0",
-                                                     paste(BATCH, PTID, VISITNO, RUNNUM, REPLICATE, STIM, sep = "_") %in% unreliable.s_2 ~ "0",
+      dplyr::mutate(reliable_flag = dplyr::case_when(paste(BATCH, PTID, VISITNO, RUNNUM, sep = "_") %in% unreliable_list_all ~ "0",
+                                                     paste(BATCH, PTID, VISITNO, RUNNUM, REPLICATE, STIM, sep = "_") %in% unreliable_list_by_stim ~ "0",
                                                      .default = "1"))
   }
 
