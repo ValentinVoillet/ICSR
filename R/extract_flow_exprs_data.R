@@ -125,6 +125,7 @@ extract_flow_exprs_data <- function(gs,
       dplyr::rename_with(~ "RUNNUM", dplyr::matches("Run Num|Collection Num")) %>%
       dplyr::rename_with(~ "REPLICATE", dplyr::matches("Replicate"))
     pd_subset$FCS <- rownames(pd_subset)
+    standardized_pd_names <- colnames(pd_subset)
     # Merging
     dt.res <- dplyr::bind_cols(comp.FI, biexp.FI, asinh.FI, asinh.asym.FI, marker_response) %>%
       dplyr::bind_cols(pd_subset[rep(1, flowWorkspace::gh_pop_get_stats(x, "root")$count), ])
@@ -137,7 +138,7 @@ extract_flow_exprs_data <- function(gs,
     # Count how many cytokines are positive per cell
     dt.output$CYTNUM <- rowSums(dt.output[, cytokine_nodes, with = FALSE] == TRUE)
     # Filter for cytokine positive cells and select final columns
-    final_cols <- c("FCS", pData_cols, "NSUB", "CYTNUM", output_nodes,
+    final_cols <- c("FCS", standardized_pd_names, "NSUB", "CYTNUM", output_nodes,
                     grep("comp|biexp|asinh", colnames(dt.output), value = TRUE))
     dt.output <- dt.output %>%
       dplyr::filter(CYTNUM >= 1) %>%
