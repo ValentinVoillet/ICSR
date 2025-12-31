@@ -2,7 +2,7 @@
 % Please edit documentation in R/do_asinh_local.R
 \name{do_asinh_local}
 \alias{do_asinh_local}
-\title{arcsinh transformation (from Spectre R package)}
+\title{Apply Inverse Hyperbolic Sine (Arcsinh) Transformation}
 \usage{
 do_asinh_local(
   dat,
@@ -13,19 +13,30 @@ do_asinh_local(
 )
 }
 \arguments{
-\item{dat}{data.table Input sample.}
+\item{dat}{A \code{data.table} containing the raw events.}
 
-\item{use.cols}{Vector of character column names – these columns will be transformed and added to the data.table as new columns.}
+\item{use.cols}{Character vector. The names of the columns to be transformed.}
 
-\item{cofactor}{Co-factor to use for arcsinh transformation.}
+\item{cofactor}{Numeric. The divisor used before applying \code{asinh}.
+Common values are 5 for CyTOF and 150-500 for Flow Cytometry. Default is 5.}
 
-\item{append.cf}{Appends the co-factor used to the end of the name of the transformed columns.}
+\item{append.cf}{Logical. If \code{TRUE}, appends the cofactor value to the
+new column names (e.g., "_asinh_cf5"). Default is \code{FALSE}.}
 
-\item{reduce.noise}{This is an experimental calculation which should reduce noise from negative values. Use with caution.}
+\item{reduce.noise}{Logical. An experimental step to reduce noise from negative
+values by shifting data and replacing negatives with a normal distribution
+around zero. Use with caution. Default is \code{FALSE}.}
 }
 \value{
-arcsinh transformed values
+The original \code{data.table} with additional columns containing the
+  transformed values.
 }
 \description{
-arcsinh transformation (from Spectre R package)
+This function performs an arcsinh transformation on specific columns of a
+\code{data.table}. This implementation is adapted from the \bold{Spectre} R package.
+Arcsinh is the standard transformation for flow and mass cytometry data
+to compress high-intensity signals and visualize data around zero.
+}
+\examples{
+# df <- do_asinh_local(my_data, use.cols = c("CD4", "CD8"), cofactor = 150)
 }

@@ -2,13 +2,14 @@
 % Please edit documentation in R/extract_flow_exprs_data.R
 \name{extract_flow_exprs_data}
 \alias{extract_flow_exprs_data}
-\title{extract_flow_exprs_data}
+\title{Extract Flow Cytometry Expression Data and Population Membership}
 \usage{
 extract_flow_exprs_data(
   gs,
   output_nodes,
   parent_node,
   cytokine_nodes,
+  pData_cols = c("BATCH", "PTID", "STIM", "VISITNO", "Run Num", "Replicate", "SAMP_ORD"),
   do.comp = FALSE,
   do.biexp = FALSE,
   do.asinh = TRUE,
@@ -19,29 +20,37 @@ extract_flow_exprs_data(
 )
 }
 \arguments{
-\item{gs}{GatingSet Object.}
+\item{gs}{A \code{GatingSet} object.}
 
-\item{output_nodes}{Flowjo gates.}
+\item{output_nodes}{Character vector. Names of the FlowJo gates to extract boolean positivity (e.g., "IFNg+").}
 
-\item{parent_node}{Parent Flowjo gate.}
+\item{parent_node}{Character. The parent gate to filter cells (e.g., "CD4"). Only cells in this gate are returned.}
 
-\item{cytokine_nodes}{Cytokine Flowjo gates.}
+\item{cytokine_nodes}{Character vector. Subset of \code{output_nodes} used to count positive cytokines per cell.}
 
-\item{do.comp}{TRUE or FALSE. If TRUE, get compensated values.}
+\item{pData_cols}{Character vector. Columns from \code{pData(gs)} to include in the output.
+Default includes BATCH, PTID, STIM, VISITNO, Run Num, Replicate, SAMP_ORD}
 
-\item{do.biexp}{TRUE or FALSE. If TRUE, get biexp transformed values using FlowJo transformation parameters.}
+\item{do.comp}{Logical. If \code{TRUE}, extracts compensated raw values.}
 
-\item{do.asinh}{TRUE or FALSE. If TRUE, get arcsinh + asym transformed values.}
+\item{do.biexp}{Logical. If \code{TRUE}, extracts FlowJo's biexponential transformed values.}
 
-\item{asym_root}{Root used for asym transformation. By default 2.}
+\item{do.asinh}{Logical. If \code{TRUE}, applies Arcsinh transformation using \code{do_asinh_local}.}
 
-\item{cofactor}{Co-factor used for arcsinh transformation.}
+\item{do.asym}{Logical. If \code{TRUE}, applies an additional asymmetric root transformation to Arcsinh values.}
 
-\item{stim_to_exclude}{Stimulation(s) to be removed. By default NULL.}
+\item{asym_root}{Numeric. The root used for asymmetric transformation. Default is 2.}
+
+\item{cofactor}{Numeric. Co-factor for Arcsinh transformation. Default is 500.}
+
+\item{stim_to_exclude}{Character vector. List of stimulations to filter out from the final results.}
 }
 \value{
-data.table with pData, FlowJo gating positivity and FI.
+A \code{data.table} where each row is a single cell, containing metadata,
+  gate positivity, and transformed intensity values.
 }
 \description{
-extract_flow_exprs_data
+This function iterates through a GatingSet to extract single-cell expression data
+(Fluorescence Intensities) and boolean gating results. It supports multiple
+transformation types (Biexponential, Arcsinh, and Asymmetric Arcsinh).
 }
