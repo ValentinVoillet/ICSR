@@ -16,8 +16,6 @@
 #' The function relies on a global or parent-environment object `batchData` which
 #' must contain `Batch` and `SAMP_ORD` columns. The resulting GatingSet is saved
 #' using `flowWorkspace::save_gs`.
-#'
-#' @examples
 raw_to_GatingSet <- function(assayid,
                              xml_path,
                              fcs_path,

@@ -144,3 +144,203 @@ list.res <- lapply(X = gs_list, FUN = function(x) {
    return()
   })
 ```
+
+------------------------------------------------------------------------
+
+## Step 3: Data Filtering & Quality Control
+
+Before proceeding to clustering or statistical inference, it is essential to clean your dataset. Analyzing samples with insufficient cell counts or unreliable data can lead to false positives and batch effect artifacts.
+
+In `ICSR`, we recommend a standard filtering workflow:
+
+1.  **Remove Control/Unreliable Samples:** Drop technical controls or samples flagged during wet-lab processing.
+2.  **Handle Duplicates:** Ensure only the most reliable replicate is kept if necessary.
+3.  **Minimum Event Threshold:** Depending on your study, filter out samples where the parent population count (`NSUB`) is too low to provide statistical power (e.g., needing at least 10,000 CD4+ T cells).
+
+### Example Filtering Workflow
+
+```{r}
+#- Filtering
+dt.exprs <- list.res$exprs %>%
+  bind_rows() %>%
+  filter(!(PTID %in% "CTACX"))
+dt.cytnum <- list.res$cytnum %>%
+  bind_rows() %>%
+  filter(!(PTID %in% "CTACX"))
+```
+
+------------------------------------------------------------------------
+
+## Step 4: Quality Control Reporting
+
+After filtering and transformation, it is critical to perform a final inspection of the data. The `create_report_QC_ICS` function generates an automated, interactive HTML report that summarizes the state of your experiment.
+
+This report allows you to: \* **Validate Transformations:** Confirm that the Arcsinh cofactors successfully resolved "squashing" or negative value artifacts. \* **Inspect Marker Distributions:** Use ridge plots to check for consistent staining across different batches. \* **Review Polyfunctionality:** Visualize the distribution of `CYTNUM` (number of cytokines per cell) across stimulations.
+
+### Example Clustering Workflow
+
+``` r
+library(rmarkdown)
+
+#- Define the markers you want to inspect in the ridge plots
+my_markers <- c("asinh_IFNg", "asinh_IL2", "asinh_TNF", "asinh_CD154", "asinh_CD107a")
+
+#- Create the automated HTML report
+create_report_QC_ICS(
+  dt.exprs = dt.exprs,
+  dt.cytnum = dt.cytnum,
+  markers = my_markers,
+  cytokine_nodes = c("IFNg", "IL2", "TNF"),
+  report_title = "Post-Filtering QC",
+  report_author = "Your Name / Lab"
+)
+```
+
+------------------------------------------------------------------------
+
+## Step 5: High-Dimensional Clustering
+
+Once the data is filtered and transformed, we identify cell populations using unsupervised clustering. Different clustering methods can be used. Here, we run the `leiden_local` function which applies the Leiden algorithm to the single-cell data.
+
+1.  **Select Markers:** Choose phenotypic markers to define subsets (e.g., Memory vs Naive).
+2.  **Run Leiden:** Execute the algorithm to partition the cells into clusters.
+3.  **Assign Clusters:** Add the cluster labels back to your main dataset for downstream analysis.
+
+### Example Clustering Workflow
+
+```{r}
+#- Define markers for clustering
+markers <- colnames(dt.exprs)[str_detect(string = colnames(dt.exprs), pattern = "asinh_asym")]
+
+#- Run Leiden clustering
+partition <- leiden_local(data = dt.exprs, markers = markers, k = 30, res = 1, niter = 1, seed = 1234)
+dt.exprs$cluster <- paste("LEIDEN", partition, sep = "_")
+
+#- Preview results
+head(dt.exprs[, .(PTID, STIM, cluster)])
+```
+
+------------------------------------------------------------------------
+
+## Step 6: UMAP Dimensionality Reduction
+
+To visualize the high-dimensional data and the identified clusters in a 2D space, we use the **UMAP** (Uniform Manifold Approximation and Projection) algorithm. This allows for a visual validation of the clustering results and the identification of spatial relationships between populations.
+
+1.  **Subsampling:** Since UMAP is computationally intensive, it is common to run it on a representative subset of cells (e.g., 50,000 cells).
+2.  **Select Markers:** Use the same phenotypic markers used for clustering to ensure the 2D map reflects the same biological backbone.
+3.  **Execution:** Run the UMAP algorithm and join the coordinates back to your data for plotting.
+
+### Example UMAP Workflow
+
+```{r}
+#- Define markers for clustering
+markers <- colnames(dt.exprs)[str_detect(string = colnames(dt.exprs), pattern = "asinh_asym")]
+
+#- Run UMAP
+UMAP.emb <- ICSR::UMAP_local(dt = dt.exprs, markers = markers, n_neighbors = 10, min_dist = .1, verbose = TRUE, n_components = 2, seed = 1234)
+dt.exprs$UMAP_1 <- UMAP.emb[, 1]
+dt.exprs$UMAP_2 <- UMAP.emb[, 2]
+
+#- Preview results
+head(dt.exprs[, .(PTID, STIM, UMAP_1, UMAP_2, cluster)])
+```
+
+------------------------------------------------------------------------
+
+## Step 7: Statistical Response Calling with MIMOSA
+
+To determine if the observed cytokine production in a cluster is a true biological response or just background noise, we use the `runMIMOSA` function. This applies a Bayesian framework to compare stimulated samples against their respective negative controls.
+
+1.  **Aggregated Input:** MIMOSA requires a table of counts (e.g., the output of your cluster-level summary) containing `NSUB` (total cells) and `CYTNUM` (positive cells).
+2.  **Cluster Iteration:** The function fits a model for each identified phenotype (Leiden clusters) to see which specific subsets are responding.
+3.  **FDR Correction:** It automatically calculates the False Discovery Rate (FDR) across antigens to provide a robust "Response Call" (TRUE/FALSE).
+
+### Example MIMOSA Workflow
+
+This step is quite code-heavy because of the data wrangling required for MIMOSA (joining negative controls).
+
+```{r}
+#- Summary
+dt.summary <- dt.exprs %>%
+  group_by(BATCH, PTID, STIM, VISITNO, RUNNUM, NSUB) %>%
+  summarize(CYTNUM = n()) %>%
+  group_by(BATCH, PTID, STIM, VISITNO, RUNNUM) %>%
+  summarise(NSUB = sum(NSUB), CYTNUM = sum(CYTNUM)) %>%
+  ungroup()
+
+#- Pre-processing by CLUSTER
+dt.tmp <- dt.exprs %>%
+  group_by(BATCH, PTID, STIM, VISITNO, CLUSTER, .drop = FALSE) %>%
+  summarize(CYTNUM = n())
+dt.tmp <- dt.tmp %>%
+  mutate(NSUB = plyr::mapvalues(x = paste(BATCH, PTID, STIM, VISITNO),
+                                from = paste(dt.summary$BATCH,
+                                             dt.summary$PTID,
+                                             dt.summary$STIM,
+                                             dt.summary$VISITNO),
+                                to = dt.summary$NSUB,
+                                warn_missing = FALSE)) %>%
+  mutate(NSUB = NSUB %>% as.numeric()) %>%
+  ungroup() %>%
+  mutate(SAMPLE = paste(PTID, VISITNO, CLUSTER)) %>%
+  select(BATCH, PTID, STIM, VISITNO, SAMPLE, CLUSTER, NSUB, CYTNUM)
+
+#- Background subtraction
+table(dt.tmp$STIM) # negctrl or NEGCTRL
+dt.tmp_1 <- dt.tmp %>%
+  filter(STIM == "negctrl") %>%
+  rename(NSUB_NEG = "NSUB", CYTNUM_NEG = "CYTNUM") %>%
+  select(SAMPLE, NSUB_NEG, CYTNUM_NEG)
+dt.tmp_2 <- dt.tmp %>%
+  filter(STIM != "negctrl")
+dt.Leiden <- merge(x = dt.tmp_2, y = dt.tmp_1, by = "SAMPLE", all.x = TRUE) %>%
+  mutate(PCTPOS = (CYTNUM / NSUB) * 100) %>%
+  mutate(PCTNEG = (CYTNUM_NEG / NSUB_NEG) * 100) %>%
+  mutate(PCTPOS_ADJ = PCTPOS - PCTNEG) %>%
+  select(BATCH, PTID, STIM, VISITNO, CLUSTER, NSUB, CYTNUM, PCTPOS, NSUB_NEG, CYTNUM_NEG, PCTNEG, PCTPOS_ADJ) %>%
+  arrange(BATCH, PTID, STIM, VISITNO)
+dt.Leiden <- na.omit(dt.Leiden)
+
+#- .CSV
+mimosaSet <- dt.Leiden %>%
+  mutate(SAMPLE = paste(PTID, VISITNO)) %>%
+  select(PTID, STIM, VISITNO, SAMPLE, CLUSTER, NSUB, CYTNUM, NSUB_NEG, CYTNUM_NEG)
+names(mimosaSet) <- toupper(names(mimosaSet))
+write.table(x = mimosaSet, file = "MIMOSA_in.csv", row.names = FALSE, sep = ",")
+
+#- Run MIMOSA response calling
+# This will save a CSV with probabilities (Pr_resp) and FDR calls
+runMIMOSA(
+  INFILE = "MIMOSA_in.csv",
+  OUTFILE = "MIMOSA_out.csv",
+  CLUSTERS = paste0("LEIDEN_", 1:10),
+  MIMOSA_THRESHOLD_FDR = 0.01,
+  FIT_METHOD = "mcmc"
+)
+
+#- Load results to see responders
+mimosa_res <- read.csv("MIMOSA_out.csv")
+head(mimosa_res[mimosa_res$mimosa_call == TRUE, ])
+```
+
+------------------------------------------------------------------------
+
+## Step 8: Downstream Analysis & Visualization
+
+With the clusters identified and the statistical response calls completed, you can now perform deep-dive analyses into your specific biological questions. Since the `dt.exprs` and `mimosa_res` objects contain all the necessary metadata, the visualization possibilities are vast and depend on your study's objectives.
+
+Common downstream tasks include:
+
+1.  **Phenotype Mapping:** Using boxplots or heatmaps to visualize the expression of markers across clusters to "name" the populations (e.g., identifying Cluster 5 as Th1-like).
+2.  **Response Landscape:** Visualizing the percentage of responding cells per cluster across different clinical groups or timepoints.
+3.  **Spatial Distribution:** Projecting clusters back onto the UMAP to see where the clusters are physically located in the high-dimensional space.
+4.  **Polyfunctionality:** Analyzing the combinations of cytokines produced within each specific cluster.
+
+### Example Visualization Concepts
+
+While the analysis is user-defined, common outputs at this stage include:
+
+-   **UMAP Plots:** Colored by Cluster, PTID, or BATCH to identify patterns.
+-   **Frequency Plots:** Boxplots showing the percentage of a specific cluster relative to the parent population.
+-   **MFI Heatmaps:** Summarizing marker expression per cluster for easy phenotype identification.
+
