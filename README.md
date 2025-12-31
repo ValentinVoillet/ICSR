@@ -214,7 +214,7 @@ markers <- colnames(dt.exprs)[str_detect(string = colnames(dt.exprs), pattern = 
 
 #- Run Leiden clustering
 partition <- leiden_local(data = dt.exprs, markers = markers, k = 30, res = 1, niter = 1, seed = 1234)
-dt.exprs$cluster <- paste("LEIDEN", partition, sep = "_")
+dt.exprs$LEIDEN <- paste("LEIDEN", partition, sep = "_")
 
 #- Preview results
 head(dt.exprs[, .(PTID, STIM, cluster)])
@@ -268,9 +268,9 @@ dt.summary <- dt.exprs %>%
   summarise(NSUB = sum(NSUB), CYTNUM = sum(CYTNUM)) %>%
   ungroup()
 
-#- Pre-processing by CLUSTER
+#- Pre-processing by LEIDEN
 dt.tmp <- dt.exprs %>%
-  group_by(BATCH, PTID, STIM, VISITNO, CLUSTER, .drop = FALSE) %>%
+  group_by(BATCH, PTID, STIM, VISITNO, LEIDEN, .drop = FALSE) %>%
   summarize(CYTNUM = n())
 dt.tmp <- dt.tmp %>%
   mutate(NSUB = plyr::mapvalues(x = paste(BATCH, PTID, STIM, VISITNO),
@@ -282,8 +282,8 @@ dt.tmp <- dt.tmp %>%
                                 warn_missing = FALSE)) %>%
   mutate(NSUB = NSUB %>% as.numeric()) %>%
   ungroup() %>%
-  mutate(SAMPLE = paste(PTID, VISITNO, CLUSTER)) %>%
-  select(BATCH, PTID, STIM, VISITNO, SAMPLE, CLUSTER, NSUB, CYTNUM)
+  mutate(SAMPLE = paste(PTID, VISITNO, LEIDEN)) %>%
+  select(BATCH, PTID, STIM, VISITNO, SAMPLE, LEIDEN, NSUB, CYTNUM)
 
 #- Background subtraction
 table(dt.tmp$STIM) # negctrl or NEGCTRL
@@ -297,14 +297,14 @@ dt.Leiden <- merge(x = dt.tmp_2, y = dt.tmp_1, by = "SAMPLE", all.x = TRUE) %>%
   mutate(PCTPOS = (CYTNUM / NSUB) * 100) %>%
   mutate(PCTNEG = (CYTNUM_NEG / NSUB_NEG) * 100) %>%
   mutate(PCTPOS_ADJ = PCTPOS - PCTNEG) %>%
-  select(BATCH, PTID, STIM, VISITNO, CLUSTER, NSUB, CYTNUM, PCTPOS, NSUB_NEG, CYTNUM_NEG, PCTNEG, PCTPOS_ADJ) %>%
+  select(BATCH, PTID, STIM, VISITNO, LEIDEN, NSUB, CYTNUM, PCTPOS, NSUB_NEG, CYTNUM_NEG, PCTNEG, PCTPOS_ADJ) %>%
   arrange(BATCH, PTID, STIM, VISITNO)
 dt.Leiden <- na.omit(dt.Leiden)
 
 #- .CSV
 mimosaSet <- dt.Leiden %>%
   mutate(SAMPLE = paste(PTID, VISITNO)) %>%
-  select(PTID, STIM, VISITNO, SAMPLE, CLUSTER, NSUB, CYTNUM, NSUB_NEG, CYTNUM_NEG)
+  select(PTID, STIM, VISITNO, SAMPLE, LEIDEN, NSUB, CYTNUM, NSUB_NEG, CYTNUM_NEG)
 names(mimosaSet) <- toupper(names(mimosaSet))
 write.table(x = mimosaSet, file = "MIMOSA_in.csv", row.names = FALSE, sep = ",")
 
