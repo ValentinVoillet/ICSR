@@ -2,22 +2,35 @@
 % Please edit documentation in R/extract_CYTNUM_data.R
 \name{extract_CYTNUM_data}
 \alias{extract_CYTNUM_data}
-\title{extract_CYTNUM_data}
+\title{Extract Cytokine Polyfunctionality Counts}
 \usage{
-extract_CYTNUM_data(gs, parent_node, cytokine_nodes, stim_to_exclude = NULL)
+extract_CYTNUM_data(
+  gs,
+  parent_node,
+  cytokine_nodes,
+  pData_cols = c("BATCH", "PTID", "STIM", "VISITNO", "Run Num", "Collection Num",
+    "Replicate", "SAMP_ORD"),
+  stim_to_exclude = NULL
+)
 }
 \arguments{
-\item{gs}{GatingSet Object.}
+\item{gs}{A \code{GatingSet} object.}
 
-\item{parent_node}{Parent Flowjo gate.}
+\item{parent_node}{Character. The parent gate to filter cells (e.g., "CD4"). Only cells in this gate are returned.}
 
-\item{cytokine_nodes}{Cytokine Flowjo gates.}
+\item{cytokine_nodes}{Character vector. Subset of \code{output_nodes} used to count positive cytokines per cell.}
 
-\item{stim_to_exclude}{Stimulation(s) to be removed. By default NULL.}
+\item{pData_cols}{Character vector. Columns from \code{pData(gs)} to include in the output.
+Default includes BATCH, PTID, STIM, VISITNO, Run Num, Replicate, SAMP_ORD}
+
+\item{stim_to_exclude}{Character vector. List of stimulations to filter out from the final results.}
 }
 \value{
-data.table with pData and number of cytokines expressed (based on FlowJo gating positivity).
+A \code{data.table} summarized by sample and positivity status,
+  containing total cell counts (\code{NSUB}) and cytokine-positive counts (\code{CYTNUM}).
 }
 \description{
-extract_CYTNUM_data
+This function calculates the number of cytokines expressed per cell (\code{CYTNUM})
+and summarizes the total number of cytokine-positive vs. cytokine-negative cells
+within a defined parent population.
 }

@@ -3,20 +3,35 @@
 
 library(flowCore)
 library(flowWorkspace)
+library(CytoML)
 library(tidyverse)
 library(here)
 library(data.table)
+library(parallel)
 
 ##----------------------------------
 #- Open Master Thaw List & .CSV file
-batchData <- readxl::read_xlsx(path = "MTL.xlsx")
-dt.workspace <- read_csv(file = "batch_to_workspace_map.csv")
+batchData <- readxl::read_xlsx(path = "/fh/fast/mcelrath_j/vvoillet_working/CHIL/Projects/M72_ID52-Frahm-Pilot/ICS/misc-docs/M72 Pilot_MTL_A Draft 15Apr24_17Apr24_VV.xlsx")
+dt.workspace <- read_csv(file = "/fh/fast/mcelrath_j/vvoillet_working/CHIL/Projects/M72_ID52-Frahm-Pilot/ICS/data-raw/version_2/batch_to_workspace_map.csv")
+dt.workspace$xml[1] <- "/fh/fast/_VIDD/HVTN/CHIL_AWS/ICS/Clinical Trial Workspaces/Aeras C-041-972 M72 Correlates POD Pilot Analysis Workspaces/2410-H-ID52-Frahm Pilot/v2 analysis/2410-H-ID52-Frahm Pilot FJ v2.xml"
+dt.workspace$xml[2] <- "/fh/fast/_VIDD/HVTN/CHIL_AWS/ICS/Clinical Trial Workspaces/Aeras C-041-972 M72 Correlates POD Pilot Analysis Workspaces/2411-R-ID52-Frahm Pilot/v2 analysis/2411-R-ID52-Frahm Pilot FJ v2.xml"
+dt.workspace$xml[3] <- "/fh/fast/_VIDD/HVTN/CHIL_AWS/ICS/Clinical Trial Workspaces/Aeras C-041-972 M72 Correlates POD Pilot Analysis Workspaces/2412-H-ID52-Frahm Pilot/v2 analysis/2412-H-ID52-Frahm Pilot FJ v2.xml"
+dt.workspace$xml[4] <- "/fh/fast/_VIDD/HVTN/CHIL_AWS/ICS/Clinical Trial Workspaces/Aeras C-041-972 M72 Correlates POD Pilot Analysis Workspaces/2413-R-ID52-Frahm Pilot/v2 analysis/2413-H-ID52-Frahm Pilot FJ v2.xml"
+dt.workspace$xml[5] <- "/fh/fast/_VIDD/HVTN/CHIL_AWS/ICS/Clinical Trial Workspaces/Aeras C-041-972 M72 Correlates POD Pilot Analysis Workspaces/2414-H-ID52-Frahm Pilot/v2 analysis/2414-H-ID52-Frahm Pilot FJ v2.xml"
 
 #- GatingSet Obj.
+#library(ICSR)
+# Test #1
+#raw_to_GatingSet(
+#  assayid = dt.workspace$assayid[1],
+#  xml_path = dt.workspace$xml[1],
+#  fcs_path = dt.workspace$fcs[1]
+#)
+# Test #2
 cl <- makeCluster(5)
-clusterExport(cl, c("batchData", "dt.workspace", "create_gating_set"))
+clusterExport(cl, c("batchData", "dt.workspace", "raw_to_GatingSet"))
 parApply(cl, dt.workspace, 1, function(x) {
-  ICSR::raw_to_GatingSet(
+  raw_to_GatingSet(
     assayid = x[["assayid"]],
     xml_path = x[["xml"]],
     fcs_path = x[["fcs"]]
@@ -25,109 +40,67 @@ parApply(cl, dt.workspace, 1, function(x) {
 stopCluster(cl)
 
 
-
 ##----------------------------------
+#- Open GatingSet obj.
+folders <- list.files(path = here("data-raw", "tmpdata"), full.names = TRUE)
+gs_list <- lapply(folders, load_gs)
 
+#- Variables
+parent_node <- "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+"
+cytokine_nodes <- c("/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/153+",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/154+",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IFNg+",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL17A_OR_IL17F",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL2+",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL4_OR_IL13",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/GM-CSF+",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/TNF+")
+output_nodes <- c("/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/R7+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/4+RA+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/Naive",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/CM",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/EM",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/TEMRA",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/153+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/154+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IFNg+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL17A_OR_IL17F",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL2+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL4_OR_IL13",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/GM-CSF+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/TNF+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/CCR6+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/CXCR3+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/CXCR5+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/DR+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/Granulysin+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/Ki67+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/NKG2C+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/PD1+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/Perforin+")
 
-
-
-
-
-
-
-
-
-###--- R script
-library(flowCore)
-library(flowWorkspace)
-#library(ICSR)
-library(tidyverse)
-library(here)
-library(data.table)
-library(doMC)
-
-
-# ml R/4.4.0-gfbf-2023b
-
-
-
-####################################################
-####################################################
-###--- ICSR (package)
-# usethis::create_github_token()
-# credentials::set_github_pat("XXX") # put your token
-# remotes::install_github("ValentinVoillet/ICSR", force = TRUE)
-
-
-
-###########################################################
-##############--- CoVPN-3008 Case/Control ---##############
-###########################################################
-
-
-####################################################
-####################################################
-###--- Open flowWorkspace objects
-folders <- list.files(path = here("data-raw", "tmpdata"), full.names = TRUE, pattern = "22")
-gs_list <- foreach(i = folders) %do%
-{
-  cat(i, "\n")
-  gs <- load_gs(path = i)
-  pData(gs)$BATCH <- pData(gs)$Batch
-  gs %>% return()
-}
-
-
-####################################################
-####################################################
-###--- compile_flow_events.R
-parent_node <- "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+"
-cytokine_nodes <- c("/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IFNg+",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL2+",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL4+",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL5_OR_IL13+",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL17a+",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL21+",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/154+",
-                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/TNFa+")
-output_nodes <- c("/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/CCR7+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/4+45RA+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/N",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/CM",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/EM",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/TEMRA",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IFNg+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL2+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL4+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL5_OR_IL13+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL17a+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/IL21+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/154+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/TNFa+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/GzB+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/Perf+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/25+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/PD1+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/CCR6+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/CXCR3+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/CXCR5+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/Ki67+",
-                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/L/S/19-/3+/3+excl 16br/56-16-/4+/FoxP3+")
-#- Processing
+#- Extraction
 list.res <- lapply(X = gs_list, FUN = function(x) {
   message(pData(x)$BATCH %>% unique())
-  compile_flow_events(gs = x,
-                      output_nodes = output_nodes,
-                      parent_node = parent_node,
-                      cytokine_nodes = cytokine_nodes,
-                      do.comp = FALSE,
-                      do.biexp = FALSE,
-                      do.asinh = TRUE,
-                      do.asym = TRUE,
-                      cofactor = 500,
-                      stim_to_exclude = "sebctrl") %>%
+  ICSR::compile_flow_events(
+    gs = x,
+    output_nodes = output_nodes,
+    parent_node = parent_node,
+    cytokine_nodes = cytokine_nodes,
+    pData_cols = c("BATCH", "SAMP_ORD", "PTID", "STIM", "VISITNO", "Run Num", "Collection Num", "Replicate"),
+    do.comp = FALSE,
+    do.biexp = FALSE,
+    do.asinh = TRUE,
+    do.asym = TRUE,
+    cofactor = 500,
+    stim_to_exclude = "sebctrl") %>%
     return()})
+saveRDS(list.res, here("data-raw", "list_dt.rds"))
+
+
+
+
 
 #- Checks
 # list.res[[1]]$exprs %>% head()

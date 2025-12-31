@@ -7,7 +7,7 @@ To start, you need:
 -   **Master thaw list**: A file containing both `Batch` and `SAMP_ORD` columns to define your experimental structure and processing order.
 -   **.CSV file**: A `.csv` file mapping your raw data files (`.fcs` and `.xml`) to specific batches (assayid).
 
-**Manifest Example**
+**Example of .CSV file**
 
 | assayid | xml                  | fcs                    |
 |:--------|:---------------------|:-----------------------|
@@ -83,7 +83,7 @@ Once your **GatingSet** objects are created, you can extract specific biological
 
 ### Example: Extracting Cytokine-Positive CD4+ T Cells
 
-In this example, we focus on a "Boolean" population—specifically, CD4+ T cells expressing at least one cytokine (CD153, CD154, IFNg, IL17A/F, IL2, IL4/13, GM-CSF and/or TNF).
+In the following code, we focus on a "Boolean" population—specifically, CD4+ T cells expressing at least one cytokine (CD153, CD154, IFNg, IL17A/F, IL2, IL4/13, GM-CSF and/or TNF).
 
 ```{r}
 #- Open GatingSet obj.
