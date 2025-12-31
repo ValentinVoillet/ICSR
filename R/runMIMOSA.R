@@ -1,30 +1,26 @@
+#' Run MIMOSA Response Calling
 #'
+#' This function applies the MIMOSA (Mixture Models for Single-Cell Analysis) framework
+#' to identify significant vaccine-induced responses. It models the distribution of
+#' cytokine-positive cells in stimulated vs. unstimulated samples to determine
+#' "responder" status per subject and per cluster.
 #'
-NULL
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# Function
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-#' # Originally created by Daryl Morris
-#' PURPOSE: Apply a response call to ICS (intracellular cytokine staining) data
-#'  as produced by the HVTN lab
+#' @param INFILE Character. Path to the input .csv file containing aggregated counts
+#'   (must include \code{NSUB}, \code{CYTNUM}, \code{PTID}, \code{STIM}, \code{VISITNO}, and \code{LEIDEN}).
+#' @param OUTFILE Character. Path where the resulting MIMOSA calls will be saved as a .csv.
+#' @param CLUSTERS Character vector. The cluster labels to iterate over (e.g., \code{paste0("Cluster_", 1:10)}).
+#' @param MIMOSA_THRESHOLD_FDR Numeric. False Discovery Rate (FDR) threshold for response calling. Default is 0.01.
+#' @param FIT_METHOD Character. Method for model fitting: \code{"mcmc"} (Markov Chain Monte Carlo) or \code{"EM"} (Expectation-Maximization).
+#' @param COMBINE Character vector. Variables to combine during stratification (e.g., \code{"VISITNO"}).
+#' @param ANTIGENFILTER Character vector. List of antigens (STIM) to exclude from the analysis.
+#' @param MINSAMPLES Integer. Minimum number of samples required. Default is 10.
+#' @param ITER Integer. Number of MCMC iterations. Minimum is 250,000.
+#' @param BURN Integer. Number of burn-in iterations for MCMC. Minimum is 50,000.
 #'
-#' @param INFILE
-#' @param OUTFILE
-#' @param CLUSTERS
-#' @param MIMOSA_THRESHOLD_FDR
-#' @param FIT_METHOD
-#' @param COMBINE
-#' @param ANTIGENFILTER
-#' @param MINSAMPLES
-#' @param ITER
-#' @param BURN
+#' @return A \code{.csv} file saved to \code{OUTFILE} containing probabilities of response and FDR-adjusted calls.
 #'
-#' @return .csv file with MIMOSA results
+#' @import MIMOSA tidyverse data.table plyr
 #' @export
-#'
-#' @examples
 runMIMOSA <- function(INFILE = NULL,
                       OUTFILE = NULL,
                       CLUSTERS = paste("Leiden:", 1:10),
@@ -36,11 +32,8 @@ runMIMOSA <- function(INFILE = NULL,
                       ITER = 250000,
                       BURN = 50000)
 {
-  #-- Require
-  require(MIMOSA)
-  require(tidyverse)
-
-  #- Argument/data checks
+  # 1. Argument Validation & Housekeeping
+  # ---------------------------------------------------------------------------
   if(!(exists("INFILE") & exists("OUTFILE"))) { stop("<infile.csv> or <oufile.csv> not defined\n") }
   if(exists("FIT_METHOD")) { match.arg(FIT_METHOD,c("EM", "mcmc")) }
   if(exists("COMBINE")){ COMBINE <- COMBINE[COMBINE %in% c("STIM", "VISITNO")] }
@@ -59,29 +52,30 @@ runMIMOSA <- function(INFILE = NULL,
     BURN <- as.numeric(BURN)
   }
 
-  #- Open files
+  # 2. Data Preparation
+  # ---------------------------------------------------------------------------
+  # Open
   data <- read.csv(INFILE)
   colnames(data) <- toupper(colnames(data))
   if(!is.null(ANTIGENFILTER)){
     message("Applying antigen filter ", ANTIGENFILTER)
     data <- subset(data, !ANTIGEN %in% ANTIGENFILTER)
   }
-
-  #- Some standard variables that must be factors.
-  tofactors <- c("PTID", "STIM", "VISITNO", "SAMPLE", "LEIDEN")
-  data[, tofactors] <- lapply(data[,tofactors], factor)
-
-  #- Check if the results columns are present
+  # Ensure critical variables are factors for MIMOSA ExpressionSet construction
+  tofactors <- intersect(c("PTID", "STIM", "VISITNO", "SAMPLE", "LEIDEN"), colnames(data))
+  data[tofactors] <- lapply(data[tofactors], factor)
+  # Check if the results columns are present
   if(!all(c("NSUB", "CYTNUM") %in% colnames(data))){
     stop("NSUB or CYTNUM columns are not present. Stopping")
-    q(save="no",status=1)
+    q(save = "no",status = 1)
   }
 
-  #- Select all columns except those explicitly listed below
+  # 3. Construct MIMOSA ExpressionSet
+  # ---------------------------------------------------------------------------
+  # MIMOSA requires a specific ExpressionSet object where 'reference' is the unstimulated control
   annotations <- c("PTID", "STIM", "VISITNO", "LEIDEN")
-  F <- as.formula(paste("component~", paste(annotations, collapse = "+"), sep = ""))
-
-  #- Construct the data
+  F <- as.formula(paste("component ~", paste(annotations, collapse = "+"), sep = ""))
+  # Construct the data
   E <- ConstructMIMOSAExpressionSet(thisdata = data,
                                     reference = NULL,
                                     measure.columns = c("CYTNUM", "NSUB"),
@@ -91,7 +85,9 @@ runMIMOSA <- function(INFILE = NULL,
                                     featureCols = 1,
                                     ref.append.replace = "_NEG")
 
-  #- Stratify
+  # 4. Stratification Logic
+  # ---------------------------------------------------------------------------
+  # Dynamically build the formula based on stratification variables
   groupBy <- function(var, F)
   {
     F <- gsub(paste("\\+", var, "\\+", sep=""), "\\+", gsub(" ", "", paste(deparse(F), collapse = "")))
@@ -117,7 +113,8 @@ runMIMOSA <- function(INFILE = NULL,
   # In this case we fit a separate model for each visit and stimulation across all subjects.
   # Below we loop on leiden, so that's also a separate model per leiden.
 
-  #- MIMOSA
+  # 5. Model Fitting (Loop over Clusters)
+  # ---------------------------------------------------------------------------
   # NOTE: called separately for each cluster (Daryl: it was done for each cytokine (IL2_or_IFNg, etc..)).
   # Here, we consider that clusters are different combinations of cytokines/markers.
   # Each element of result is a MIMOSAResultList (a list of MIMOSAResult's) the MIMOSAResultList has one element for each combo of stratification vars
@@ -134,6 +131,10 @@ runMIMOSA <- function(INFILE = NULL,
                                              iter = ITER,
                                              burn = BURN)))
   }
+
+  # 6. Result Aggregation & FDR Correction
+  # ---------------------------------------------------------------------------
+  # Flatten the nested result lists into a single data frame
   res.full <- ddply(do.call(rbind, lapply(result, function(r) do.call(rbind, lapply(r, function(tc) {
     cbind(pData(tc),
           effect = {
@@ -152,13 +153,12 @@ runMIMOSA <- function(INFILE = NULL,
     fdr = MIMOSA:::fdr(cbind(Pr_nonresp, Pr_resp)))
   res.full$Mimosa.call <- res.full$fdr < MIMOSA_THRESHOLD_FDR
 
-  #- Some additional error checking
+  # 7. Output
+  # ---------------------------------------------------------------------------
   with(res.full, if(all(Pr_nonresp == fdr)){
     warning("The FDR is equal to the probability of non-response.\n",
             "Unless you are adjusting over one antigen something may have gone wrong.");
   })
-
-  #- Output
   colnames(res.full) <- tolower(colnames(res.full))
   write.table(res.full, file = OUTFILE, sep = ",", row.names = FALSE, quote = FALSE)
 }
