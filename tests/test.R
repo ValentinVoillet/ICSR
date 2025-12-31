@@ -1,3 +1,42 @@
+# ml R/4.4.0-gfbf-2023b
+# remotes::install_github("ValentinVoillet/ICSR", force = TRUE)
+
+library(flowCore)
+library(flowWorkspace)
+library(tidyverse)
+library(here)
+library(data.table)
+
+##----------------------------------
+#- Open Master Thaw List & .CSV file
+batchData <- readxl::read_xlsx(path = "MTL.xlsx")
+dt.workspace <- read_csv(file = "batch_to_workspace_map.csv")
+
+#- GatingSet Obj.
+cl <- makeCluster(5)
+clusterExport(cl, c("batchData", "dt.workspace", "create_gating_set"))
+parApply(cl, dt.workspace, 1, function(x) {
+  ICSR::raw_to_GatingSet(
+    assayid = x[["assayid"]],
+    xml_path = x[["xml"]],
+    fcs_path = x[["fcs"]]
+  )
+})
+stopCluster(cl)
+
+
+
+##----------------------------------
+
+
+
+
+
+
+
+
+
+
 ###--- R script
 library(flowCore)
 library(flowWorkspace)
@@ -29,7 +68,6 @@ library(doMC)
 ####################################################
 ####################################################
 ###--- Open flowWorkspace objects
-# /fh/fast/mcelrath_j/vvoillet_working/CHIL/Projects/CoVPN-3008/ICS_Case-Control
 folders <- list.files(path = here("data-raw", "tmpdata"), full.names = TRUE, pattern = "22")
 gs_list <- foreach(i = folders) %do%
 {
@@ -103,7 +141,6 @@ saveRDS(object = list.res, file = here("data", "raw_test.rds"))
 ####################################################
 ###--- Filtering
 #- Unreliable
-unreliable.s <- readxl::read_xlsx("~/Documents/CHIL/CoVPN-3008/ICS_Case-Control/misc-docs/CoVPN 3008 Case Cohort_Unreliable data_16NOV23_A_modified_08FEB2024.xlsx")
 unreliable.s <- unreliable.s[2:nrow(unreliable.s), ]
 unreliable.s %>%
   filter(`Unreliable Stim` == "ALL") %>%
@@ -122,7 +159,6 @@ lapply(X = list.res.raw, function(x) x$cytnum) %>%
   bind_rows() -> dt.cytnum.raw
 
 #- Filtering - dt.exprs
-dt.MTL <- readxl::read_xlsx("~/Documents/CHIL/CoVPN-3008/ICS_Case-Control/misc-docs/CoVPN3008 Cases_MTL_A_14Sep23_VV.xlsx")
 colnames(dt.MTL)[1] <- "BATCH"
 colnames(dt.MTL)[10] <- "RUNNUM"
 ICSR::do_filtering(dt = dt.exprs.raw,
