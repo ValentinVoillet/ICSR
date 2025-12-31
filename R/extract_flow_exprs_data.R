@@ -1,66 +1,69 @@
-#' @include do_asinh_local.R
+#' Extract Flow Cytometry Expression Data and Population Membership
 #'
-NULL
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# Function
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-#' extract_flow_exprs_data
+#' This function iterates through a GatingSet to extract single-cell expression data
+#' (Fluorescence Intensities) and boolean gating results. It supports multiple
+#' transformation types (Biexponential, Arcsinh, and Asymmetric Arcsinh).
 #'
-#' @param gs GatingSet Object.
-#' @param output_nodes Flowjo gates.
-#' @param parent_node Parent Flowjo gate.
-#' @param cytokine_nodes Cytokine Flowjo gates.
-#' @param do.comp TRUE or FALSE. If TRUE, get compensated values.
-#' @param do.biexp TRUE or FALSE. If TRUE, get biexp transformed values using FlowJo transformation parameters.
-#' @param do.asinh TRUE or FALSE. If TRUE, get arcsinh transformed values.
-#' @param do.asinh TRUE or FALSE. If TRUE, get arcsinh + asym transformed values.
-#' @param asym_root Root used for asym transformation. By default 2.
-#' @param cofactor Co-factor used for arcsinh transformation.
-#' @param stim_to_exclude Stimulation(s) to be removed. By default NULL.
+#' @param gs A \code{GatingSet} object.
+#' @param output_nodes Character vector. Names of the FlowJo gates to extract boolean positivity (e.g., "IFNg+").
+#' @param parent_node Character. The parent gate to filter cells (e.g., "CD4"). Only cells in this gate are returned.
+#' @param cytokine_nodes Character vector. Subset of \code{output_nodes} used to count positive cytokines per cell.
+#' @param pData_cols Character vector. Columns from \code{pData(gs)} to include in the output.
+#'   Default includes BATCH, PTID, STIM, VISITNO, Run Num, Replicate, SAMP_ORD
+#' @param do.comp Logical. If \code{TRUE}, extracts compensated raw values.
+#' @param do.biexp Logical. If \code{TRUE}, extracts FlowJo's biexponential transformed values.
+#' @param do.asinh Logical. If \code{TRUE}, applies Arcsinh transformation using \code{do_asinh_local}.
+#' @param do.asym Logical. If \code{TRUE}, applies an additional asymmetric root transformation to Arcsinh values.
+#' @param asym_root Numeric. The root used for asymmetric transformation. Default is 2.
+#' @param cofactor Numeric. Co-factor for Arcsinh transformation. Default is 500.
+#' @param stim_to_exclude Character vector. List of stimulations to filter out from the final results.
 #'
-#' @return data.table with pData, FlowJo gating positivity and FI.
+#' @return A \code{data.table} where each row is a single cell, containing metadata,
+#'   gate positivity, and transformed intensity values.
 #'
+#' @import flowWorkspace flowCore tidyverse data.table
 #' @export
-#'
-#' @examples
 extract_flow_exprs_data <- function(gs,
                                     output_nodes,
                                     parent_node,
                                     cytokine_nodes,
+                                    pData_cols = c("BATCH", "PTID", "STIM", "VISITNO", "Run Num", "Replicate", "SAMP_ORD"),
                                     do.comp = FALSE,
                                     do.biexp = FALSE,
                                     do.asinh = TRUE,
                                     do.asym = TRUE,
                                     asym_root = 2,
                                     cofactor = 500,
-                                    stim_to_exclude = NULL)
-{
-  #- Require
-  require(flowWorkspace)
-  require(flowCore)
-  require(tidyverse)
-  require(data.table)
+                                    stim_to_exclude = NULL) {
 
-  #- Checks
-  if(do.asinh == FALSE & do.asym == TRUE){
-    stop("do.asinh need to be TRUE when using do.asym = TRUE.")
+  # 1. Pre-computation Checks
+  # ---------------------------------------------------------------------------
+  if (!do.asinh && do.asym) {
+    stop("Arcsinh transformation must be TRUE to use Asymmetric transformation.")
   }
 
-  #- Extraction
-  exprs.tmp <- flowWorkspace::lapply(gs, function(x)
-  {
-    # Annotation
-    annotation <- data.frame(markername = flowWorkspace::markernames(x) %>% names(),
-                             colname = sapply(X = flowWorkspace::markernames(x), FUN = function(x) str_split(string = x, pattern = " ")[[1]][1]),
-                             row.names = flowWorkspace::markernames(x) %>% names()) %>%
-      dplyr::mutate(colname = str_replace_all(string = colname, pattern = "/", replacement = "_")) %>%
-      dplyr::mutate(colname = case_when(colname == "Integrin" ~ "Integrin-B7",
-                                        colname == "Granzyme" ~ "Granzyme-B", colname == "GzB" ~ "Granzyme-B",
-                                        colname == "PD1" ~ "PD-1",
-                                        colname == "TNFa" ~ "TNF", .default = colname))
+  # 2. Main Extraction Loop (Per Sample)
+  # ---------------------------------------------------------------------------
+  exprs.tmp <- flowWorkspace::lapply(gs, function(x) {
 
+    # --- Metadata & Marker Mapping ---
+    # Standardizes marker names and handles common naming discrepancies
+    mark_names <- flowWorkspace::markernames(x)
+    annotation <- data.frame(
+      markername = names(mark_names),
+      colname = sapply(mark_names, function(m) str_split(m, " ")[[1]][1]),
+      row.names = names(mark_names)
+    ) %>%
+      dplyr::mutate(colname = str_replace_all(colname, "/", "_")) %>%
+      dplyr::mutate(colname = case_when(
+        colname == "Integrin" ~ "Integrin-B7",
+        colname %in% c("Granzyme", "GzB") ~ "Granzyme-B",
+        colname == "PD1" ~ "PD-1",
+        colname == "TNFa" ~ "TNF",
+        .default = colname
+      ))
+
+    # --- Data Extraction: Compensated & Biexponential ---
     # Get compensated data
     if(do.comp == TRUE){
       comp.FI <- flowCore::exprs(flowWorkspace::gh_pop_get_data(x, inverse.transform = TRUE))
@@ -69,7 +72,6 @@ extract_flow_exprs_data <- function(gs,
     }else{
       comp.FI <- NULL
     }
-
     # Get FlowJo biexp
     if(do.biexp == TRUE){
       biexp.FI <- flowCore::exprs(flowWorkspace::gh_pop_get_data(x, inverse.transform = FALSE))
@@ -78,15 +80,12 @@ extract_flow_exprs_data <- function(gs,
     }else{
       biexp.FI <- NULL
     }
-
     # Get arcsinh trans. data
     comp.FI.tmp <- flowCore::exprs(flowWorkspace::gh_pop_get_data(x, inverse.transform = TRUE))
     comp.FI.tmp <- comp.FI.tmp[, intersect(colnames(comp.FI.tmp), annotation$markername)]
     colnames(comp.FI.tmp) <- paste("comp", annotation[colnames(comp.FI.tmp), "colname"], sep = "_")
     markers <- colnames(comp.FI.tmp)
-    asinh.FI <- ICSR::do_asinh_local(dat = comp.FI.tmp %>% as.data.table(),
-                                     use.cols = markers,
-                                     cofactor = cofactor)
+    asinh.FI <- ICSR::do_asinh_local(dat = comp.FI.tmp %>% as.data.table(), use.cols = markers, cofactor = cofactor)
     markers <- colnames(asinh.FI)[str_detect(string = colnames(asinh.FI), pattern = "asinh")]
     asinh.FI <- asinh.FI %>%
       dplyr::select(dplyr::all_of(markers))
@@ -95,7 +94,6 @@ extract_flow_exprs_data <- function(gs,
     if(do.asinh == FALSE){
       asinh.FI <- NULL
     }
-
     # Get arcsinh+asym trans. data
     asym_root_2_lo <- function(x, a = 2) {
       x <- case_when(x < (a - 1) ~ (a - abs(x-a)^(1/2)),
@@ -108,48 +106,53 @@ extract_flow_exprs_data <- function(gs,
       asinh.asym.FI <- NULL
     }
 
-    # Get boolean positivity call for markers
-    options(warn = 0)
-    marker_response <- try(lapply(output_nodes, function(mrkr){flowWorkspace::gh_pop_get_indices(x, mrkr)}))
-    while(class(marker_response) == "try-error"){
-      marker_response <- try(lapply(output_nodes, function(mrkr){flowWorkspace::gh_pop_get_indices(x, mrkr)}))
+    # --- Population Positivity (Boolean Indices) ---
+    # Retrieve true/false indices for each specified gate
+    marker_response <- NULL
+    # Using a retry loop for robust extraction from GatingSet
+    while(is.null(marker_response)) {
+      marker_response <- tryCatch({
+        res <- lapply(output_nodes, function(mrkr) flowWorkspace::gh_pop_get_indices(x, mrkr))
+        names(res) <- output_nodes
+        dplyr::bind_rows(res)
+      }, error = function(e) NULL)
     }
-    names(marker_response) <- output_nodes
-    marker_response <- dplyr::bind_rows(marker_response)
 
-    # data.table()
+    # --- Merging Metadata & Results ---
+    # Extract requested pData columns
+    pd_subset <- flowWorkspace::pData(x) %>%
+      dplyr::select(dplyr::any_of(pData_cols)) %>%
+      dplyr::rename_with(~ "RUNNUM", dplyr::matches("Run Num|Collection Num")) %>%
+      dplyr::rename_with(~ "REPLICATE", dplyr::matches("Replicate"))
+    pd_subset$FCS <- rownames(pd_subset)
+    # Merging
     dt.res <- dplyr::bind_cols(comp.FI, biexp.FI, asinh.FI, asinh.asym.FI, marker_response) %>%
-      dplyr::mutate(FCS = rownames(pData(x))) %>%
-      dplyr::mutate(BATCH = pData(x)$BATCH) %>%
-      dplyr::mutate(PTID = pData(x)$PTID) %>%
-      dplyr::mutate(STIM = pData(x)$STIM) %>%
-      dplyr::mutate(VISITNO = pData(x)$VISITNO) %>%
-      dplyr::mutate(RUNNUM = pData(x)$`Run Num`) %>%
-      dplyr::mutate(REPLICATE = pData(x)$Replicate) %>%
-      dplyr::mutate(SAMP_ORD = pData(x)$SAMP_ORD)
+      dplyr::bind_cols(pd_subset[rep(1, flowWorkspace::gh_pop_get_stats(x, "root")$count), ])
 
-    # Output
+    # --- Final Filtering ---
+    # Only keep cells belonging to the parent gate and expressing at least 1 cytokine
     dt.output <- dt.res %>%
-      dplyr::filter(get({{parent_node}}) == TRUE) %>%
-      dplyr::group_by(FCS, BATCH, PTID, STIM, VISITNO, RUNNUM, REPLICATE, SAMP_ORD) %>%
+      dplyr::filter(get(parent_node) == TRUE) %>%
       dplyr::mutate(NSUB = n())
-    dt.output$CYTNUM <- apply(dt.output[, cytokine_nodes], 1, function(x) sum(x == TRUE))
-    cols <- c("FCS", "BATCH", "PTID", "STIM", "VISITNO", "RUNNUM", "REPLICATE", "SAMP_ORD", "NSUB", "CYTNUM",
-              colnames(dt.output)[str_detect(string = colnames(dt.output), pattern = "Time")],
-              colnames(dt.output)[str_detect(string = colnames(dt.output), pattern = "comp")],
-              colnames(dt.output)[str_detect(string = colnames(dt.output), pattern = "biexp")],
-              colnames(dt.output)[str_detect(string = colnames(dt.output), pattern = "asinh")])
+    # Count how many cytokines are positive per cell
+    dt.output$CYTNUM <- rowSums(dt.output[, cytokine_nodes, with = FALSE] == TRUE)
+    # Filter for cytokine positive cells and select final columns
+    final_cols <- c("FCS", pData_cols, "NSUB", "CYTNUM", output_nodes,
+                    grep("comp|biexp|asinh", colnames(dt.output), value = TRUE))
     dt.output <- dt.output %>%
-      dplyr::ungroup() %>%
       dplyr::filter(CYTNUM >= 1) %>%
-      dplyr::select(dplyr::all_of(cols))
-    dt.output %>% return()
+      dplyr::select(dplyr::all_of(intersect(final_cols, colnames(dt.output))))
   })
 
-  #- Filtering & Output
-  dplyr::bind_rows(exprs.tmp) %>%
-    dplyr::filter(!(STIM %in% stim_to_exclude)) %>%
-    data.table() %>%
-    return()
+  # 3. Final Aggregation and Filtering
+  # ---------------------------------------------------------------------------
+  res_final <- dplyr::bind_rows(exprs.tmp)
+  if (!is.null(stim_to_exclude)) {
+    stim_col <- intersect(c("STIM", "Stim"), colnames(res_final))[1]
+    if (!is.na(stim_col)) {
+      res_final <- res_final %>% dplyr::filter(!(get(stim_col) %in% stim_to_exclude))
+    }
+  }
+  return(data.table::as.data.table(res_final))
 }
 
