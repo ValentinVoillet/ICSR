@@ -2,14 +2,14 @@
 % Please edit documentation in R/create_report_QC_ICS.R
 \name{create_report_QC_ICS}
 \alias{create_report_QC_ICS}
-\title{ICS QC Report}
+\title{Generate an Automated ICS Quality Control Report}
 \usage{
 create_report_QC_ICS(
   dt.exprs,
   dt.cytnum,
   cytokine_nodes = NULL,
   markers = NULL,
-  output_format = html_document(toc = TRUE, toc_depth = 6, theme = "yeti"),
+  output_format = rmarkdown::html_document(toc = TRUE, toc_depth = 6, theme = "yeti"),
   output_file = "ICS_QC_report.html",
   output_dir = getwd(),
   report_title = "ICS QC Report",
@@ -17,24 +17,41 @@ create_report_QC_ICS(
 )
 }
 \arguments{
-\item{dt.exprs}{input data.table. Including FI.}
+\item{dt.exprs}{A \code{data.table} containing single-cell expression data
+(typically the \code{exprs} element from \code{compile_flow_events}).}
 
-\item{dt.cytnum}{input data.table. Including # of cytokines per sample.}
+\item{dt.cytnum}{A \code{data.table} containing summarized population counts
+(typically the \code{cytnum} element from \code{compile_flow_events}).}
 
-\item{cytokine_nodes}{Cytokine Flowjo gates. By default, NULL.}
+\item{cytokine_nodes}{Character vector. Names of cytokine gates to include
+in the polyfunctionality summary.}
 
-\item{markers}{List of markers (ridge plots). By default, NULL.}
+\item{markers}{Character vector. List of markers to visualize using ridge plots.
+Should match column names in \code{dt.exprs}.}
 
-\item{output_format}{output format in \link{render}. Default is \code{html_document(toc = TRUE, toc_depth = 6, theme = "yeti")}.}
+\item{output_format}{The RMarkdown render format. Defaults to a
+\code{html_document} with a floating TOC and the 'yeti' theme.}
 
-\item{output_file}{output file name in \link{render}. Default is "ICS_QC_report.html".}
+\item{output_file}{Character. The name of the resulting HTML file.
+Default is "ICS_QC_report.html".}
 
-\item{output_dir}{output directory for report in \link{render}. Default is user's current directory.}
+\item{output_dir}{Character. The directory where the report will be saved.
+Defaults to the current working directory.}
 
-\item{report_title}{report title. Default is "ICS QC Report".}
+\item{report_title}{Character. The title displayed at the top of the report.}
 
-\item{report_author}{report authors. Default is NULL.}
+\item{report_author}{Character. The name of the author/lab to display.}
+}
+\value{
+Invisibly returns the path to the generated report and opens it in
+  the default web browser.
 }
 \description{
-This function creates a data QC report.
+This function takes the extracted expression and polyfunctionality data to
+generate a comprehensive HTML QC report. The report includes visualizations for
+marker distributions (ridge plots), cytokine positivity, and sample-level
+statistics to guide data filtering.
+}
+\examples{
+# create_report_QC_ICS(dt.exprs = output$exprs, dt.cytnum = output$cytnum)
 }

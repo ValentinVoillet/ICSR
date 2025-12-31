@@ -2,24 +2,38 @@
 % Please edit documentation in R/leiden_local.R
 \name{leiden_local}
 \alias{leiden_local}
-\title{Leiden algorithm}
+\title{Leiden-based Clustering for Single-Cell Data}
 \usage{
 leiden_local(data, markers, k = 30, res = 1, niter = 10, seed = 1234)
 }
 \arguments{
-\item{markers}{Markers to use for clustering.}
+\item{data}{A \code{data.table} or \code{data.frame} containing single-cell events.}
 
-\item{k}{Number of k neighbors.}
+\item{markers}{Character vector. The names of the markers (columns) to use for clustering.}
 
-\item{res}{Resolution. A parameter controlling the coarseness of the clusters.}
+\item{k}{Integer. The number of nearest neighbors used to build the SNN graph. Default is 30.}
 
-\item{niter}{Number of iterations to run the Leiden algorithm.}
+\item{res}{Numeric. The resolution parameter controlling the granularity of the
+clusters. Higher values lead to more clusters. Default is 1.}
 
-\item{seed}{Seed for the random number generator.}
+\item{niter}{Integer. The number of iterations to run the Leiden algorithm. Default is 10.}
+
+\item{seed}{Integer. Seed for reproducibility. Default is 1234.}
 }
 \value{
-partition of Leiden clusters
+A character vector of cluster assignments (partitions) for each cell.
 }
 \description{
-Leiden algorithm
+This function performs unsupervised clustering using the Leiden algorithm
+on a Shared Nearest Neighbor (SNN) graph. It follows the Rphenograph
+logic by calculating Jaccard coefficients but uses the more robust Leiden
+community detection to find cell populations.
+}
+\details{
+The function utilizes the \code{Rphenograph} Jaccard coefficient calculation
+(via C++ call) to weigh the edges of the graph before passing it to the
+Leiden algorithm.
+}
+\examples{
+# clusters <- leiden_local(data = filtered_exprs, markers = my_markers, k = 30, res = 0.8)
 }

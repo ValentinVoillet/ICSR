@@ -2,9 +2,7 @@
 % Please edit documentation in R/runMIMOSA.R
 \name{runMIMOSA}
 \alias{runMIMOSA}
-\title{# Originally created by Daryl Morris
-PURPOSE: Apply a response call to ICS (intracellular cytokine staining) data
- as produced by the HVTN lab}
+\title{Run MIMOSA Response Calling}
 \usage{
 runMIMOSA(
   INFILE = NULL,
@@ -20,13 +18,33 @@ runMIMOSA(
 )
 }
 \arguments{
-\item{BURN}{}
+\item{INFILE}{Character. Path to the input .csv file containing aggregated counts
+(must include \code{NSUB}, \code{CYTNUM}, \code{PTID}, \code{STIM}, \code{VISITNO}, and \code{LEIDEN}).}
+
+\item{OUTFILE}{Character. Path where the resulting MIMOSA calls will be saved as a .csv.}
+
+\item{CLUSTERS}{Character vector. The cluster labels to iterate over (e.g., \code{paste0("Cluster_", 1:10)}).}
+
+\item{MIMOSA_THRESHOLD_FDR}{Numeric. False Discovery Rate (FDR) threshold for response calling. Default is 0.01.}
+
+\item{FIT_METHOD}{Character. Method for model fitting: \code{"mcmc"} (Markov Chain Monte Carlo) or \code{"EM"} (Expectation-Maximization).}
+
+\item{COMBINE}{Character vector. Variables to combine during stratification (e.g., \code{"VISITNO"}).}
+
+\item{ANTIGENFILTER}{Character vector. List of antigens (STIM) to exclude from the analysis.}
+
+\item{MINSAMPLES}{Integer. Minimum number of samples required. Default is 10.}
+
+\item{ITER}{Integer. Number of MCMC iterations. Minimum is 250,000.}
+
+\item{BURN}{Integer. Number of burn-in iterations for MCMC. Minimum is 50,000.}
 }
 \value{
-.csv file with MIMOSA results
+A \code{.csv} file saved to \code{OUTFILE} containing probabilities of response and FDR-adjusted calls.
 }
 \description{
-# Originally created by Daryl Morris
-PURPOSE: Apply a response call to ICS (intracellular cytokine staining) data
- as produced by the HVTN lab
+This function applies the MIMOSA (Mixture Models for Single-Cell Analysis) framework
+to identify significant vaccine-induced responses. It models the distribution of
+cytokine-positive cells in stimulated vs. unstimulated samples to determine
+"responder" status per subject and per cluster.
 }

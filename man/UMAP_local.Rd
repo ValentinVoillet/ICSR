@@ -2,7 +2,7 @@
 % Please edit documentation in R/UMAP_local.R
 \name{UMAP_local}
 \alias{UMAP_local}
-\title{UMAP}
+\title{Run UMAP Dimensionality Reduction}
 \usage{
 UMAP_local(
   dt,
@@ -15,21 +15,30 @@ UMAP_local(
 )
 }
 \arguments{
-\item{markers}{Markers to use for UMAP.}
+\item{dt}{A \code{data.table} or \code{data.frame} containing the single-cell events.}
 
-\item{n_neighbors}{The size of local neighborhood. See `uwot::umap`.}
+\item{markers}{Character vector. The names of the markers (columns) to use for the projection.}
 
-\item{min_dist}{The effective minimum distance between embedded points. See `uwot::umap`.}
+\item{n_neighbors}{Integer. The size of local neighborhood used for manifold approximation.
+Larger values result in more global structure. Default is 10.}
 
-\item{verbose}{If TRUE, log details to the console. See `uwot::umap`.}
+\item{min_dist}{Numeric. The effective minimum distance between embedded points.
+Smaller values result in tighter clusters. Default is 0.1.}
 
-\item{n_components}{The dimension of the space to embed into. See `uwot::umap`.}
+\item{verbose}{Logical. If \code{TRUE}, logs progress details to the console.}
 
-\item{seed}{Seed for the random number generator.}
+\item{n_components}{Integer. The dimension of the space to embed into. Default is 2.}
+
+\item{seed}{Integer. Seed for reproducibility. Default is 1234.}
 }
 \value{
-UMAP embeddings
+A \code{matrix} of UMAP embeddings with \code{n_components} columns.
 }
 \description{
-UMAP
+This function is a wrapper for the \code{uwot::umap} implementation. It
+transforms high-dimensional flow cytometry data into a low-dimensional
+space (typically 2D) for visualization.
+}
+\examples{
+# umap_coords <- UMAP_local(dt = dt.exprs, markers = clustering_markers, n_neighbors = 15)
 }
