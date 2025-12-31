@@ -28,6 +28,13 @@ A **GatingSet** is a powerful data structure provided by the `flowWorkspace` eco
 You can initialize your GatingSet using the following code:
 
 ```{r}
+library(flowCore)
+library(flowWorkspace)
+library(CytoML)
+library(tidyverse)
+library(here)
+library(data.table)
+library(parallel)
 library(ICSR)
 
 #- Open Master Thaw List & .CSV file
@@ -45,4 +52,95 @@ parApply(cl, dt.workspace, 1, function(x) {
   )
 })
 stopCluster(cl)
+```
+
+------------------------------------------------------------------------
+
+## Step 2: Extract Data of Interest
+
+Once your **GatingSet** objects are created, you can extract specific biological data for downstream analysis. The function `compile_flow_events` allows you to pull two types of information simultaneously:
+
+1.  **Fluorescence Intensities:** The actual signal strength for every marker on a per-cell basis (supporting both raw and transformed values).
+
+**Example of `head(output$exprs)`:**
+
+| BATCH | PTID      | STIM | RUNNUM | REPLICATE | CYTNUM | asinh_IFNg | asinh_IL2 | IFNg+ | IL2+  |
+|:-------|:-------|:-------|:-------|:-------|:-------|:-------|:-------|:-------|:-------|
+| 2410  | Subject_A | Env  | 1      | 1         | 2      | 4.52       | 3.12      | TRUE  | TRUE  |
+| 2410  | Subject_A | Env  | 1      | 1         | 1      | 0.82       | 4.05      | FALSE | TRUE  |
+| 2410  | Subject_B | Env  | 2      | 1         | 0      | 0.15       | 0.45      | FALSE | FALSE |
+
+2.  **Cell Counts:** Population statistics for specific gates across your entire experiment.
+
+**Example of `head(output$cytnum)`:**
+
+| BATCH | PTID      | STIM | RUNNUM | REPLICATE | NSUB  | boolean_CYTNUM | CYTNUM |
+|:------|:----------|:-----|:-------|:----------|:------|:---------------|:-------|
+| 2410  | Subject_A | Env  | 1      | 1         | 45000 | TRUE           | 152    |
+| 2410  | Subject_A | Env  | 1      | 1         | 45000 | FALSE          | 44848  |
+| 2410  | Subject_B | Env  | 2      | 1         | 42300 | TRUE           | 45     |
+| 2410  | Subject_B | Env  | 2      | 1         | 42300 | FALSE          | 42255  |
+
+### Example: Extracting Cytokine-Positive CD4+ T Cells
+
+In this example, we focus on a "Boolean" population—specifically, CD4+ T cells expressing at least one cytokine (CD153, CD154, IFNg, IL17A/F, IL2, IL4/13, GM-CSF and/or TNF).
+
+```{r}
+#- Open GatingSet obj.
+folders <- list.files(path = here("data-raw", "tmpdata"), full.names = TRUE)
+gs_list <- lapply(folders, load_gs)
+
+#- Variables
+parent_node <- "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+"
+cytokine_nodes <- c("/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/153+",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/154+",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IFNg+",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL17A_OR_IL17F",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL2+",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL4_OR_IL13",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/GM-CSF+",
+                    "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/TNF+")
+output_nodes <- c("/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/R7+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/4+RA+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/Naive",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/CM",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/EM",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/TEMRA",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/153+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/154+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IFNg+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL17A_OR_IL17F",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL2+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/IL4_OR_IL13",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/GM-CSF+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/TNF+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/CCR6+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/CXCR3+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/CXCR5+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/DR+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/Granulysin+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/Ki67+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/NKG2C+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/PD1+",
+                  "/Time/K1/K2/K3/K4/K5/K6/K7/K8/Lv/14-/S/L/3+/56-16-/gd-/4+/Perforin+")
+
+#- Extraction
+list.res <- lapply(X = gs_list, FUN = function(x) {
+  message(pData(x)$BATCH %>% unique())
+  compile_flow_events(
+    gs = x,
+    output_nodes = output_nodes,
+    parent_node = parent_node,
+    cytokine_nodes = cytokine_nodes,
+    pData_cols = c("BATCH", "SAMP_ORD", "PTID", "STIM", "VISITNO", "Run Num", "Collection Num", "Replicate"),
+    do.comp = FALSE,
+    do.biexp = FALSE,
+    do.asinh = TRUE,
+    do.asym = TRUE,
+    cofactor = 500,
+    stim_to_exclude = "sebctrl"
+    ) %>%
+   return()
+  })
 ```
