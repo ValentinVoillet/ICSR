@@ -1,6 +1,6 @@
 # ICSR
 
-## 0. Getting Started
+## Getting Started
 
 To start, you need:
 
@@ -175,11 +175,17 @@ dt.cytnum <- list.res$cytnum %>%
 
 After filtering and transformation, it is critical to perform a final inspection of the data. The `create_report_QC_ICS` function generates an automated, interactive HTML report that summarizes the state of your experiment.
 
-This report allows you to: \* **Validate Transformations:** Confirm that the Arcsinh cofactors successfully resolved "squashing" or negative value artifacts. \* **Inspect Marker Distributions:** Use ridge plots to check for consistent staining across different batches. \* **Review Polyfunctionality:** Visualize the distribution of `CYTNUM` (number of cytokines per cell) across stimulations.
+This report allows you to:
+
+-   **Validate Transformations:** Confirm that your chosen transformation successfully resolved "squashing" or negative value artifacts.
+
+-   **Inspect Marker Distributions:** Use ridge plots to check for consistent staining across different batches.
+
+-   **Review Polyfunctionality:** Visualize the distribution of `CYTNUM` (number of cytokines per cell) across stimulations.
 
 ### Example Clustering Workflow
 
-``` r
+```{r}
 library(rmarkdown)
 
 #- Define the markers you want to inspect in the ridge plots
@@ -217,7 +223,7 @@ partition <- leiden_local(data = dt.exprs, markers = markers, k = 30, res = 1, n
 dt.exprs$LEIDEN <- paste("LEIDEN", partition, sep = "_")
 
 #- Preview results
-head(dt.exprs[, .(PTID, STIM, cluster)])
+head(dt.exprs[, .(PTID, STIM, LEIDEN)])
 ```
 
 ------------------------------------------------------------------------
@@ -226,7 +232,7 @@ head(dt.exprs[, .(PTID, STIM, cluster)])
 
 To visualize the high-dimensional data and the identified clusters in a 2D space, we use the **UMAP** (Uniform Manifold Approximation and Projection) algorithm. This allows for a visual validation of the clustering results and the identification of spatial relationships between populations.
 
-1.  **Subsampling:** Since UMAP is computationally intensive, it is common to run it on a representative subset of cells (e.g., 50,000 cells).
+1.  **Subsampling (if needed):** Since UMAP is computationally intensive, it is common to run it on a representative subset of cells (e.g., 50,000 cells).
 2.  **Select Markers:** Use the same phenotypic markers used for clustering to ensure the 2D map reflects the same biological backbone.
 3.  **Execution:** Run the UMAP algorithm and join the coordinates back to your data for plotting.
 
@@ -242,7 +248,7 @@ dt.exprs$UMAP_1 <- UMAP.emb[, 1]
 dt.exprs$UMAP_2 <- UMAP.emb[, 2]
 
 #- Preview results
-head(dt.exprs[, .(PTID, STIM, UMAP_1, UMAP_2, cluster)])
+head(dt.exprs[, .(PTID, STIM, UMAP_1, UMAP_2,LEIDEN)])
 ```
 
 ------------------------------------------------------------------------
@@ -251,13 +257,13 @@ head(dt.exprs[, .(PTID, STIM, UMAP_1, UMAP_2, cluster)])
 
 To determine if the observed cytokine production in a cluster is a true biological response or just background noise, we use the `runMIMOSA` function. This applies a Bayesian framework to compare stimulated samples against their respective negative controls.
 
-1.  **Aggregated Input:** MIMOSA requires a table of counts (e.g., the output of your cluster-level summary) containing `NSUB` (total cells) and `CYTNUM` (positive cells).
-2.  **Cluster Iteration:** The function fits a model for each identified phenotype (Leiden clusters) to see which specific subsets are responding.
+1.  **Aggregated Input:** MIMOSA requires a table of counts (e.g., the output of your cluster-level summary) containing `NSUB` (total cells) and `CYTNUM` (positive cells) in the stimulated and unstimulated samples.
+2.  **Cluster Iteration:** The function fits a model for each identified phenotype (clusters) to see which specific subsets are responding.
 3.  **FDR Correction:** It automatically calculates the False Discovery Rate (FDR) across antigens to provide a robust "Response Call" (TRUE/FALSE).
 
-### Example MIMOSA Workflow
-
 This step is quite code-heavy because of the data wrangling required for MIMOSA (joining negative controls).
+
+### Example MIMOSA Workflow
 
 ```{r}
 #- Summary
@@ -343,4 +349,3 @@ While the analysis is user-defined, common outputs at this stage include:
 -   **UMAP Plots:** Colored by Cluster, PTID, or BATCH to identify patterns.
 -   **Frequency Plots:** Boxplots showing the percentage of a specific cluster relative to the parent population.
 -   **MFI Heatmaps:** Summarizing marker expression per cluster for easy phenotype identification.
-
