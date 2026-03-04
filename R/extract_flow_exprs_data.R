@@ -49,6 +49,7 @@ extract_flow_exprs_data <- function(gs,
     # --- Metadata & Marker Mapping ---
     # Standardizes marker names and handles common naming discrepancies
     mark_names <- flowWorkspace::markernames(x)
+    mark_names[str_detect(string = mark_names, pattern = "TCR gd")] <- "TCRgd"
     annotation <- data.frame(
       markername = names(mark_names),
       colname = sapply(mark_names, function(m) str_split(m, " ")[[1]][1]),
