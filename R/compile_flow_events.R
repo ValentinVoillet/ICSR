@@ -54,7 +54,7 @@ compile_flow_events <- function(gs,
                                             output_nodes = output_nodes,
                                             parent_node = parent_node,
                                             cytokine_nodes = cytokine_nodes,
-                                            pData_cols = c("BATCH", "PTID", "STIM", "VISITNO", "Run Num", "Collection Num", "Replicate", "SAMP_ORD"),
+                                            pData_cols = pData_cols,
                                             do.comp = do.comp,
                                             do.biexp = do.biexp,
                                             do.asinh = do.asinh,
@@ -70,7 +70,7 @@ compile_flow_events <- function(gs,
   dt.cytnum <- ICSR::extract_CYTNUM_data(gs = gs,
                                          parent_node = parent_node,
                                          cytokine_nodes = cytokine_nodes,
-                                         pData_cols = c("BATCH", "PTID", "STIM", "VISITNO", "Run Num", "Collection Num", "Replicate", "SAMP_ORD"),
+                                         pData_cols = pData_cols,
                                          stim_to_exclude = stim_to_exclude)
 
   # 4. Final Output Construction
