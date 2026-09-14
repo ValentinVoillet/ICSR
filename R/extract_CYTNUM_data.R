@@ -43,8 +43,14 @@ extract_CYTNUM_data <- function(gs,
     # Extract requested pData columns
     pd_subset <- flowWorkspace::pData(x) %>%
       dplyr::select(dplyr::any_of(pData_cols)) %>%
-      dplyr::rename_with(~ "RUNNUM", dplyr::matches("Run Num|Collection Num|RUNNUM")) %>%
-      dplyr::rename_with(~ "REPLICATE", dplyr::matches("Replicate"))
+      dplyr::rename_with(
+        ~ rep("RUNNUM", length(.x)),
+        dplyr::matches("Run Num|Collection Num|RUNNUM")
+      ) %>%
+      dplyr::rename_with(
+        ~ rep("REPLICATE", length(.x)),
+        dplyr::matches("Replicate")
+      )
     pd_subset$FCS <- rownames(pd_subset)
     standardized_pd_names <- colnames(pd_subset)
     # Merging
